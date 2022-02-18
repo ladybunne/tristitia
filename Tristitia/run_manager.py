@@ -66,15 +66,15 @@ class Run:
     }
 
     # format party lead string for use in Overview (either None or <@ID>)
-    def format_lead(self, key):
-        if self.leads[key] is None:
+    def format_lead(self, element):
+        if self.leads[element] is None:
             return None
-        return f"<@{self.leads[key]}>"
+        return f"<@{self.leads[element]}>"
 
     # caluclate no. of party members (used in roster field title display)
-    def calculate_party_members(self, key):
-        lead = 0 if key == "reserve" or self.leads[key] is None else 1
-        return lead + len(self.roster[key])
+    def calculate_party_members(self, element):
+        lead = 0 if element == "reserve" or self.leads[element] is None else 1
+        return lead + len(self.roster[element])
 
     # format party title (for roster menu)
     def format_party_title(self, element):
@@ -84,13 +84,16 @@ class Run:
 
     # format a party's list of members
     def format_party_list(self, element):
-        if len(self.roster[element]) == 0:
-            return "None"
-        else:
-            party_list = ""
-            for user_id in self.roster[element]:
-                party_list += f"<@{user_id}>\n"
-            return party_list
+        party_list = ""
+        if element != "reserve" and self.leads[element] is not None:
+            party_list = f"⭐<@{self.leads[element]}>\n"
+        for user_id in self.roster[element]:
+            party_list += f"<@{user_id}>"
+            if len(self.roster[element]) == 0 or self.roster[element][-1] != user_id:
+                party_list += "\n" if element != "reserve" else ", "
+        if party_list == "":
+            party_list = "None"
+        return party_list
 
     # generate the overview embed
     def generate_embed_overview(self):
@@ -145,44 +148,111 @@ class Run:
     def update_embeds(self, client):
         return
 
+    def check_current_lead(self, user_id):
+        for e in elements[:-1]:
+            if user_id == self.leads[e]:
+                return e
+        return None
+
     def check_current_party(self, user_id):
         for e in elements:
             if user_id in self.roster[e]:
                 return e
         return None
 
-    def register_party_lead(self, user_id, element):
-        return
+    def lead_add(self, user_id, element):
+        if self.leads[element] is None:
+            self.leads[element] = user_id
+            return True
+        else:
+            # this lead is occupied by someone else
+            return False
 
-    def register_party_member(self, user_id, element):
-        print("blah")
+    def lead_remove(self, user_id, element):
+        if self.leads[element] == user_id:
+            self.leads[element] = None
+            return True
+        else:
+            # can't remove, not this lead
+            return False
 
-        existing_party = self.check_current_party(user_id)
-        changed = False
+    def party_add(self, user_id, element):
+        if user_id not in self.roster[element]:
+            # -1 is because of leads
+            if len(self.roster[element]) < max_party_size - 1:
+                self.roster[element].append(user_id)
+                return True
+            else:
+                # party full
+                return False
+        else:
+            # already in party
+            return False
 
-        # if in this party, remove
-        if element == existing_party:
+    def party_remove(self, user_id, element):
+        if user_id in self.roster[element]:
             try:
                 self.roster[element].remove(user_id)
-                print(f"removed user {user_id} from {element} party")
-                changed = True
+                return True
             except ValueError:
-                print("Something broke.")
+                # weird shit
+                return False
+        else:
+            # already not in party
+            return False
 
-        # if in another party
+    def register_party_lead(self, user_id, element):
+        existing_party = self.check_current_party(user_id)
+        existing_lead = self.check_current_lead(user_id)
+        changed = False
+
+        # can't lead if in a party
+        if existing_party is not None:
+            # probably DM a warning about this
+            return changed
+
+        # if leading this party, remove
+        elif element == existing_lead:
+            changed = self.lead_remove(user_id, element)
+
+        # if leading another party, move
+        elif existing_lead is not None:
+            if self.lead_add(user_id, element):
+                if self.lead_remove(user_id, existing_lead):
+                    changed = True
+                else:
+                    print("moved party lead could not be removed from previous lead position")
+
+        # lead the selected party if no leader
+        else:
+            changed = self.lead_add(user_id, element)
+
+        return changed
+
+    def register_party_member(self, user_id, element):
+        existing_party = self.check_current_party(user_id)
+        existing_lead = self.check_current_lead(user_id)
+        changed = False
+
+        # if already leading, can't join another party
+        if existing_lead is not None:
+            return changed
+
+        # if in this party, remove
+        elif element == existing_party:
+            changed = self.party_remove(user_id, element)
+
+        # if in another party, move
         elif existing_party is not None:
-            # uh idk sort this out later
-            print("idfk")
-            return
+            if self.party_add(user_id, element):
+                if self.party_remove(user_id, existing_party):
+                    changed = True
+                else:
+                    print("moved party member could not be removed from previous party")
 
         # join the current party if it's not full
         else:
-            if len(self.roster[element]) < max_party_size:
-                self.roster[element].append(user_id)
-                print(f"added user {user_id} to {element} party")
-                changed = True
-            else:
-                print(f"party {element} is full, user {user_id} could not join")
+            changed = self.party_add(user_id, element)
 
         return changed
 
@@ -215,18 +285,23 @@ def register_party_lead():
 def get_run_from_interaction(i: discord.Interaction):
     # figure out which run is being edited
     for r in future_runs:
-        if r.roster_message_id == i.message_id:
+        if r.overview_message_id == i.message_id or r.roster_message_id == i.message_id:
             return r
 
-    print("very bad stuff")
-    return Run(0, 0, 0)
+    return None
+
+# make this way better at some point
 
 
-async def update_embeds(client, run):
+async def update_overview_embed(client, run):
     signup_channel = client.get_guild(guild_id).get_channel(signup_channel_id)
     overview_message = await signup_channel.fetch_message(run.overview_message_id)
-    roster_message = await signup_channel.fetch_message(run.roster_message_id)
     await overview_message.edit(embed=run.generate_embed_overview())
+
+
+async def update_roster_embed(client, run):
+    signup_channel = client.get_guild(guild_id).get_channel(signup_channel_id)
+    roster_message = await signup_channel.fetch_message(run.roster_message_id)
     await roster_message.edit(embed=run.generate_embed_roster())
 
 

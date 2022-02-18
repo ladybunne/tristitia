@@ -22,19 +22,28 @@ async def on_message(client, message):
 
 
 async def on_click_lead(client, i: discord.Interaction, button, element):
-    print(f"tried to sign up as {element} lead")
-    await i.defer()
+    # print(f"tried to sign up as {element} lead")
+    run = rm.get_run_from_interaction(i)
+    if run is None:
+        print("run not found when trying to click party lead button")
+        await i.defer()
+    else:
+        if run.register_party_lead(i.user_id, element):
+            await i.edit(embed=run.generate_embed_overview())
+            await rm.update_roster_embed(client, run)
+        else:
+            await i.defer()
 
 
 async def on_click_party(client, i: discord.Interaction, button, element):
-    print(f"tried to join {element} party")
+    # print(f"tried to join {element} party")
     run = rm.get_run_from_interaction(i)
     if run is None:
+        print("run not found when trying to click party join button")
         await i.defer()
     else:
         if run.register_party_member(i.user_id, element):
             await i.edit(embed=run.generate_embed_roster())
-
         else:
             await i.defer()
 

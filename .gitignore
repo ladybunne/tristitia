@@ -132,3 +132,6 @@ dmypy.json
 
 # This obviously can't be allowed.
 token.txt
+
+# This is just local storage.
+*.pk

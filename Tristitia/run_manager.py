@@ -68,7 +68,7 @@ class Run:
     # format party lead string for use in Overview (either None or <@ID>)
     def format_lead(self, element):
         if self.leads[element] is None:
-            return None
+            return " None"
         return f"<@{self.leads[element]}>"
 
     # caluclate no. of party members (used in roster field title display)
@@ -99,9 +99,17 @@ class Run:
     def generate_embed_overview(self):
         embed = discord.Embed()
 
-        leads_list = ""
-        for element in elements[:-1]:
-            leads_list += f"\n{hexes[element]} {self.format_lead(element)}"
+        # old leads list method (one big list)
+        # leads_list = ""
+        # for element in elements[:-1]:
+        #     leads_list += f"\n{hexes[element]}{self.format_lead(element)}"
+
+        def lead(element):
+            return f"{hexes[element]}{self.format_lead(element)}"
+
+        leads_list = (f"\n{lead('earth')} {lead('wind')} {lead('water')}\n"
+                      f"{lead('fire')} {lead('lightning')} {lead('ice')}\n"
+                      f"{lead('support')}")
 
         embed.title = f"Run ID: #{self.run_id} - Overview"
         embed.description = (f"**Raid Lead**: <@{self.raid_lead}>\n"
@@ -206,13 +214,8 @@ class Run:
         existing_lead = self.check_current_lead(user_id)
         changed = False
 
-        # can't lead if in a party
-        if existing_party is not None:
-            # probably DM a warning about this
-            return changed
-
         # if leading this party, remove
-        elif element == existing_lead:
+        if element == existing_lead:
             changed = self.lead_remove(user_id, element)
 
         # if leading another party, move
@@ -226,6 +229,12 @@ class Run:
         # lead the selected party if no leader
         else:
             changed = self.lead_add(user_id, element)
+            # if previously in a party, remove from party
+            if changed and existing_party is not None:
+                if self.party_remove(user_id, existing_party):
+                    return changed
+                else:
+                    print("party member, moved to lead, could not be removed from previous party")
 
         return changed
 
@@ -236,6 +245,7 @@ class Run:
 
         # if already leading, can't join another party
         if existing_lead is not None:
+            # DM about this.
             return changed
 
         # if in this party, remove

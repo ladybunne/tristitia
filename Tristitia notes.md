@@ -18,6 +18,7 @@ Embeds
     Embed 1: Overview
         List event creator (raid lead)
         List dynamic timestamp
+        List a little description of the run (type / purpose / conditions).
         Leads (one of each element)
     Reacts:
         Fancy Discord button reacts for party leads. Click again to remove.

@@ -3,9 +3,8 @@ import re
 import run_manager as rm
 
 
-async def on_ready(client):
+def on_ready(client):
     print('We have logged in as {0.user}'.format(client))
-    await rm.regenerate_run(client)
 
 
 async def on_message(client, message):

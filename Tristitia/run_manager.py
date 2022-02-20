@@ -26,21 +26,27 @@ scheduler.start()
 ELEMENTS = ["earth", "wind", "water", "fire", "lightning", "ice", "support", "reserve"]
 
 MSG_PARTY_LEAD_SWAP_TO_MEMBER = (
-    "**Unable to join {0}{1} Party**. You are currently registered as {2}{3} Lead.\n"
+    "**Unable to join {icon}{element_party} Party**. You are currently registered as {hex}{element_lead} Lead.\n"
     "Please unregister from the lead position, by clicking the button again, if you "
     "wish to be able to join parties as a non-lead."
 )
 
 MSG_NOTIFY_LEADS = (
-    "Hello, **{0}{1} Lead** of Run #{2}! It's time to put up your party!\n"
-    "**The password for your party ({1}) is __{3}__**.\n\n"
+    "Hello, **{hex}{element} Lead** of Run #{run_id}! It's time to put up your party!\n"
+    "**The password for your party ({element}) is __{password}__**.\n\n"
     "Please put up your party ASAP, with the above password, under Adventuring Forays -> Eureka Hydatos.\n"
     "Copy this text and use it for the party description:\n"
-    "```The Fire Place vs BA, Run #{2} - {1} Party```\n"
+    "```The Fire Place vs BA, Run #{run_id} - {element} Party```\n"
     "Please also ensure you have, in total, **1 tank**, **2 healers** and **5 any** slots listed, minus yourself.\n"
-    "Party members will receive passwords <t:{4}:R>, at <t:{4}:F>. "
+    "Party members will receive passwords <t:{time}:R>, at <t:{time}:F>. "
     "Please ensure your party is up and configured by then!\n\n"
     "If you have any questions, please DM Athena (<@97139537569910784>)! Thank you!"
+)
+
+MSG_NOTIFY_MEMBERS = (
+    "Hello, member of **{icon}{element} Party**, for Run #{run_id}! It's time to join your party!\n"
+    "**The password for your party ({element}) is __{password}__**.\n\n"
+    "Please look under Private in the Party Finder for your party. It should be listed under <@{4}>."
 )
 
 # The Fire Place specific values
@@ -254,8 +260,10 @@ class Run:
         if existing_lead is not None:
             try:
                 await i.user.send((
-                    f"{MSG_PARTY_LEAD_SWAP_TO_MEMBER}".format(ICONS[element], element.capitalize(),
-                                                              HEXES[existing_lead], existing_lead.capitalize())))
+                    f"{MSG_PARTY_LEAD_SWAP_TO_MEMBER}".format(icon=ICONS[element],
+                                                              element_party=element.capitalize(),
+                                                              hex=HEXES[existing_lead],
+                                                              element_lead=existing_lead.capitalize())))
             except:
                 print(f"unable to DM user {user_id} about swapping off lead")
             return False
@@ -301,8 +309,11 @@ class Run:
                 continue
 
             try:
-                await user.send(f"{MSG_NOTIFY_LEADS}".format(HEXES[element], element.capitalize(), self.run_id, "1111",
-                                                             calendar.timegm(members_notify_time.utctimetuple())))
+                await user.send(f"{MSG_NOTIFY_LEADS}".format(hex=HEXES[element],
+                                                             element=element.capitalize(),
+                                                             run_id=self.run_id,
+                                                             password="1111",
+                                                             time=calendar.timegm(members_notify_time.utctimetuple())))
             except:
                 print(f"unable to send DM to lead with ID: {user.id}")
 
@@ -310,6 +321,13 @@ class Run:
         return
 
     async def notify_members(self, client):
+        reserves_notify_time = datetime.utcfromtimestamp(self.time) + timedelta(minutes=RESERVES_TIME_DELTA)
+
+        # private threads for this
+        # failing that, DMs
+        for element in ELEMENTS[:-1]:
+            for party_member in self.roster[element]:
+                user = await client.fetch_user(self.leads[element])
         return
 
     async def notify_reserves(self, client):
@@ -341,11 +359,6 @@ def save_runs():
     except IOError:
         print("saving failed")
         return False
-
-
-# startup
-future_runs = load_runs()
-past_runs = load_runs(future=False)
 
 
 def make_new_run(raid_lead, time):
@@ -396,6 +409,7 @@ async def regenerate_embeds(client):
         print("unable to complete embed regeneration")
 
 
+# TODO add in timing stuff for if this is run at different timing windows
 def schedule_run(client, run):
     async def notify_closure():
         await run.notify_leads(client)
@@ -439,3 +453,7 @@ async def request_new_run(client, message, time):
     await run.send_embed_messages(signup_channel)
     schedule_run(client, run)
     save_runs()
+
+# startup
+future_runs = load_runs()
+past_runs = load_runs(future=False)

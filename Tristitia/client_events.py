@@ -5,9 +5,12 @@ import discord
 
 import run_manager as rm
 
+
 async def on_ready(client):
-    print('We have logged in as {0.user}'.format(client))
+    print(f"Logged in as {client.user}")
+
     for run in rm.future_runs:
+        rm.schedule_run(client, run)
         if await rm.update_embed(client, run):
             await rm.update_embed(client, run, overview=False)
 

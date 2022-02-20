@@ -8,6 +8,9 @@ import run_manager as rm
 
 async def on_ready(client):
     print('We have logged in as {0.user}'.format(client))
+    for run in rm.future_runs:
+        if await rm.update_embed(client, run):
+            await rm.update_embed(client, run, overview=False)
 
 
 async def on_message(client, message):
@@ -31,7 +34,7 @@ async def on_click_lead(client, i: discord.Interaction, button, element):
     else:
         if run.register_party_lead(i.user_id, element):
             task1 = asyncio.create_task(i.edit(embed=run.generate_embed_overview()))
-            task2 = asyncio.create_task(rm.update_roster_embed(client, run))
+            task2 = asyncio.create_task(rm.update_embed(client, run, overview=False))
             await task1
             await task2
             rm.save_runs()
@@ -48,7 +51,7 @@ async def on_click_party(client, i: discord.Interaction, button, element):
     else:
         if run.register_party_member(i.user_id, element):
             task1 = asyncio.create_task(i.edit(embed=run.generate_embed_roster()))
-            task2 = asyncio.create_task(rm.update_overview_embed(client, run))
+            task2 = asyncio.create_task(rm.update_embed(client, run))
             await task1
             await task2
             rm.save_runs()

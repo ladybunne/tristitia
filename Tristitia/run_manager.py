@@ -1,14 +1,12 @@
 import discord
-from discord import ActionRow, Button, ButtonStyle
-import pickle
+import jsonpickle
+from discord import Button, ButtonStyle
 
 START_INDEX = 2
-future_runs = []
-past_runs = []
 MAX_PARTY_SIZE = 8
 
-FUTURE_RUNS_FILENAME = "future_runs.pk"
-PAST_RUNS_FILENAME = "past_runs.pk"
+FUTURE_RUNS_FILENAME = "future_runs.json"
+PAST_RUNS_FILENAME = "past_runs.json"
 
 # I know support and reserve aren't *actual* elements.
 ELEMENTS = ["earth", "wind", "water", "fire", "lightning", "ice", "support", "reserve"]
@@ -48,22 +46,20 @@ ELEMENT_BUTTON_STYLES = {
 
 SP_EMOJI = "<:sp:944158078440456233>"
 
+
 class Run:
     def __init__(self, run_id, raid_lead, time):
         self.run_id = run_id
         self.raid_lead = raid_lead
         self.time = time
-
-    overview_message_id = None
-    roster_message_id = None
-
-    leads = {
-        "earth": None, "wind": None, "water": None, "fire": None, "lightning": None, "ice": None, "support": None
-    }
-
-    roster = {
-        "earth": [], "wind": [], "water": [], "fire": [], "lightning": [], "ice": [], "support": [], "reserve": []
-    }
+        self.overview_message_id = None
+        self.roster_message_id = None
+        self.leads = {
+            "earth": None, "wind": None, "water": None, "fire": None, "lightning": None, "ice": None, "support": None
+        }
+        self.roster = {
+            "earth": [], "wind": [], "water": [], "fire": [], "lightning": [], "ice": [], "support": [], "reserve": []
+        }
 
     # format party lead string for use in Overview (either None or <@ID>)
     def format_lead(self, element):
@@ -80,7 +76,14 @@ class Run:
     def format_party_title(self, element):
         if element == "reserve":
             return f"Reserves ({self.calculate_party_members(element)})"
-        return f"{ICONS[element]} {element.capitalize()} ({self.calculate_party_members(element)}/{MAX_PARTY_SIZE})"
+
+        party_count = f"{self.calculate_party_members(element)}/{MAX_PARTY_SIZE}"
+
+        # if all non-lead spots are occupied, say FULL
+        if len(self.roster[element]) >= MAX_PARTY_SIZE - 1:
+            party_count = "FULL"
+
+        return f"{ICONS[element]} {element.capitalize()} ({party_count})"
 
     # format a party's list of members
     def format_party_list(self, element):
@@ -122,34 +125,6 @@ class Run:
         for e in ELEMENTS:
             embed.add_field(name=self.format_party_title(e), value=self.format_party_list(e))
         return embed
-
-    # generate the overview's buttons
-    def generate_overview_buttons(self):
-        button_list = []
-        for e in ELEMENTS[:-1]:
-            button_list.append(Button(label=f"{e} lead".title(),
-                                      custom_id=e + "_lead",
-                                      style=ELEMENT_BUTTON_STYLES[e],
-                                      emoji=HEXES[e]))
-        row_1 = button_list[:3] + [button_list[-1]]
-        row_2 = button_list[3:6]
-        return [row_1, row_2]
-
-    # generate the roster's buttons
-    def generate_roster_buttons(self):
-        button_list = []
-        for e in ELEMENTS:
-            button_list.append(Button(label=f"{e} Party".title() if e != "reserve" else "Reserves",
-                                      custom_id=e + "_party",
-                                      style=ELEMENT_BUTTON_STYLES[e],
-                                      emoji=ICONS[e] if e != "reserve" else None))
-        row_1 = button_list[:3] + [button_list[-2]]
-        row_2 = button_list[3:6] + [button_list[-1]]
-        return [row_1, row_2]
-
-    # update embeds on overview and roster messages (requires a client)
-    def update_embeds(self, client):
-        return
 
     def check_current_lead(self, user_id):
         for e in ELEMENTS[:-1]:
@@ -261,21 +236,51 @@ class Run:
 
         return changed
 
+    async def send_embed_messages(self, signup_channel):
+        overview_message = await signup_channel.send(embed=self.generate_embed_overview(),
+                                                     components=generate_overview_buttons())
+        roster_message = await signup_channel.send(embed=self.generate_embed_roster(),
+                                                   components=generate_roster_buttons())
+        self.overview_message_id = overview_message.id
+        self.roster_message_id = roster_message.id
+
+
+def load_runs(future=True):
+    try:
+        file = open(FUTURE_RUNS_FILENAME if future else PAST_RUNS_FILENAME, "r")
+        loaded_runs = jsonpickle.decode(file.read())
+        file.close()
+        return loaded_runs
+    except IOError:
+        print(f"Unable to load {'future' if future else 'past'} runs.")
+        return []
+
+
+def save_runs():
+    try:
+        future_file = open(FUTURE_RUNS_FILENAME, "w")
+        future_runs_out = jsonpickle.encode(future_runs, keys=True)
+        future_file.write(future_runs_out)
+        future_file.close()
+        past_file = open(PAST_RUNS_FILENAME, "w")
+        past_runs_out = jsonpickle.encode(past_runs, keys=True)
+        past_file.write(past_runs_out)
+        past_file.close()
+        return True
+    except IOError:
+        print("saving failed")
+        return False
+
+
+# startup
+future_runs = load_runs()
+past_runs = load_runs(future=False)
+
 
 def make_new_run(raid_lead, time):
     run_id = START_INDEX + len(future_runs) + len(past_runs)
     future_runs.append(Run(run_id, raid_lead, time))
     return future_runs[-1]
-
-
-def save_runs():
-    future_file = open(FUTURE_RUNS_FILENAME, "wb")
-    pickle.dump(future_runs, future_file)
-    future_file.close()
-
-
-def register_party_lead():
-    return
 
 
 def get_run_from_interaction(i: discord.Interaction):
@@ -287,16 +292,63 @@ def get_run_from_interaction(i: discord.Interaction):
     return None
 
 
-async def update_overview_embed(client, run):
+async def update_embed(client, run, overview=True):
     signup_channel = client.get_guild(GUILD_ID).get_channel(SIGNUP_CHANNEL_ID)
-    overview_message = await signup_channel.fetch_message(run.overview_message_id)
-    await overview_message.edit(embed=run.generate_embed_overview())
+    try:
+        message_id = run.overview_message_id if overview else run.roster_message_id
+        message = await signup_channel.fetch_message(message_id)
+        generated_embed = run.generate_embed_overview() if overview else run.generate_embed_roster()
+        await message.edit(embed=generated_embed)
+        return True
+    except discord.errors.NotFound:
+        await regenerate_embeds(client)
+        return False
 
 
-async def update_roster_embed(client, run):
+async def regenerate_embeds(client):
     signup_channel = client.get_guild(GUILD_ID).get_channel(SIGNUP_CHANNEL_ID)
-    roster_message = await signup_channel.fetch_message(run.roster_message_id)
-    await roster_message.edit(embed=run.generate_embed_roster())
+
+    try:
+        # delete all messages in channel
+        old_messages = await signup_channel.history().flatten()
+
+        for old_message in old_messages:
+            await old_message.delete()
+
+        regen_message = await signup_channel.send("Regenerating embeds, please wait.")
+
+        for run in future_runs:
+            await run.send_embed_messages(signup_channel)
+
+        await regen_message.delete()
+    except Exception:
+        print("unable to complete embed regeneration")
+
+
+# generate the roster's buttons
+def generate_roster_buttons():
+    button_list = []
+    for e in ELEMENTS:
+        button_list.append(Button(label=f"{e} Party".title() if e != "reserve" else "Reserves",
+                                  custom_id=e + "_party",
+                                  style=ELEMENT_BUTTON_STYLES[e],
+                                  emoji=ICONS[e] if e != "reserve" else None))
+    row_1 = button_list[:3] + [button_list[-2]]
+    row_2 = button_list[3:6] + [button_list[-1]]
+    return [row_1, row_2]
+
+
+# generate the overview's buttons
+def generate_overview_buttons():
+    button_list = []
+    for e in ELEMENTS[:-1]:
+        button_list.append(Button(label=f"{e} lead".title(),
+                                  custom_id=e + "_lead",
+                                  style=ELEMENT_BUTTON_STYLES[e],
+                                  emoji=HEXES[e]))
+    row_1 = button_list[:3] + [button_list[-1]]
+    row_2 = button_list[3:6]
+    return [row_1, row_2]
 
 
 async def request_new_run(client, message, time):
@@ -304,19 +356,5 @@ async def request_new_run(client, message, time):
     await message.channel.send((f"Created run with ID #{run.run_id}, led by <@{run.raid_lead}>, "
                                 f"scheduled for <t:{run.time}:F> (<t:{run.time}:R>)."))
     signup_channel = client.get_channel(SIGNUP_CHANNEL_ID)
-    overview_message = await signup_channel.send(embed=run.generate_embed_overview(),
-                                                 components=run.generate_overview_buttons())
-    roster_message = await signup_channel.send(embed=run.generate_embed_roster(),
-                                               components=run.generate_roster_buttons())
-    run.overview_message_id = overview_message.id
-    run.roster_message_id = roster_message.id
+    await run.send_embed_messages(signup_channel)
     save_runs()
-
-
-# startup
-try:
-    future_file = open(FUTURE_RUNS_FILENAME, "rb")
-    future_runs = pickle.load(future_file)
-    future_file.close()
-except IOError:
-    print("Unable to load stored runs.")

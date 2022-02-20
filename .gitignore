@@ -134,4 +134,5 @@ dmypy.json
 token.txt
 
 # This is just local storage.
-*.pk
+future_runs.json
+past_runs.json

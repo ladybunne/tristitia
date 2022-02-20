@@ -1,5 +1,10 @@
+import calendar
+
 import discord
 import jsonpickle
+from datetime import datetime, timedelta
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
 from discord import Button, ButtonStyle
 
 START_INDEX = 2
@@ -8,8 +13,35 @@ MAX_PARTY_SIZE = 8
 FUTURE_RUNS_FILENAME = "future_runs.json"
 PAST_RUNS_FILENAME = "past_runs.json"
 
+# -15, 0, 10
+LEADS_TIME_DELTA = -1
+MEMBERS_TIME_DELTA = 0
+RESERVES_TIME_DELTA = 1
+
+# async events to notify people of passwords and stuff
+scheduler = AsyncIOScheduler(timezone="utc")
+scheduler.start()
+
 # I know support and reserve aren't *actual* elements.
 ELEMENTS = ["earth", "wind", "water", "fire", "lightning", "ice", "support", "reserve"]
+
+MSG_PARTY_LEAD_SWAP_TO_MEMBER = (
+    "**Unable to join {0}{1} Party**. You are currently registered as {2}{3} Lead.\n"
+    "Please unregister from the lead position, by clicking the button again, if you "
+    "wish to be able to join parties as a non-lead."
+)
+
+MSG_NOTIFY_LEADS = (
+    "Hello, **{0}{1} Lead** of Run #{2}! It's time to put up your party!\n"
+    "**The password for your party ({1}) is __{3}__**.\n\n"
+    "Please put up your party ASAP, with the above password, under Adventuring Forays -> Eureka Hydatos.\n"
+    "Copy this text and use it for the party description:\n"
+    "```The Fire Place vs BA, Run #{2} - {1} Party```\n"
+    "Please also ensure you have, in total, **1 tank**, **2 healers** and **5 any** slots listed, minus yourself.\n"
+    "Party members will receive passwords <t:{4}:R>, at <t:{4}:F>. "
+    "Please ensure your party is up and configured by then!\n\n"
+    "If you have any questions, please DM Athena (<@97139537569910784>)! Thank you!"
+)
 
 # The Fire Place specific values
 
@@ -59,6 +91,9 @@ class Run:
         }
         self.roster = {
             "earth": [], "wind": [], "water": [], "fire": [], "lightning": [], "ice": [], "support": [], "reserve": []
+        }
+        self.passwords = {
+            "earth": None, "wind": None, "water": None, "fire": None, "lightning": None, "ice": None, "support": None
         }
 
     # format party lead string for use in Overview (either None or <@ID>)
@@ -179,7 +214,8 @@ class Run:
             # already not in party
             return False
 
-    def register_party_lead(self, user_id, element):
+    async def register_party_lead(self, i: discord.Interaction, element):
+        user_id = i.user_id
         existing_party = self.check_current_party(user_id)
         existing_lead = self.check_current_lead(user_id)
         changed = False
@@ -208,15 +244,21 @@ class Run:
 
         return changed
 
-    def register_party_member(self, user_id, element):
+    async def register_party_member(self, i: discord.Interaction, element):
+        user_id = i.user_id
         existing_party = self.check_current_party(user_id)
         existing_lead = self.check_current_lead(user_id)
         changed = False
 
         # if already leading, can't join another party
         if existing_lead is not None:
-            # DM about this.
-            return changed
+            try:
+                await i.user.send((
+                    f"{MSG_PARTY_LEAD_SWAP_TO_MEMBER}".format(ICONS[element], element.capitalize(),
+                                                              HEXES[existing_lead], existing_lead.capitalize())))
+            except:
+                print(f"unable to DM user {user_id} about swapping off lead")
+            return False
 
         # if in this party, remove
         elif element == existing_party:
@@ -243,6 +285,35 @@ class Run:
                                                    components=generate_roster_buttons())
         self.overview_message_id = overview_message.id
         self.roster_message_id = roster_message.id
+
+    async def notify_leads(self, client):
+        members_notify_time = datetime.utcfromtimestamp(self.time) + timedelta(minutes=MEMBERS_TIME_DELTA)
+
+        for element in ELEMENTS[:-1]:
+            # generate passwords now!
+            if self.leads[element] is None:
+                print(f"no lead found for element: {element}")
+                continue
+
+            user = await client.fetch_user(self.leads[element])
+            if user is None:
+                print(f"{element} lead could not be retrieved")
+                continue
+
+            try:
+                await user.send(f"{MSG_NOTIFY_LEADS}".format(HEXES[element], element.capitalize(), self.run_id, "1111",
+                                                             calendar.timegm(members_notify_time.utctimetuple())))
+            except:
+                print(f"unable to send DM to lead with ID: {user.id}")
+
+        # schedule notify_members at members_notify_time
+        return
+
+    async def notify_members(self, client):
+        return
+
+    async def notify_reserves(self, client):
+        return
 
 
 def load_runs(future=True):
@@ -321,8 +392,17 @@ async def regenerate_embeds(client):
             await run.send_embed_messages(signup_channel)
 
         await regen_message.delete()
-    except Exception:
+    except:
         print("unable to complete embed regeneration")
+
+
+def schedule_run(client, run):
+    async def notify_closure():
+        await run.notify_leads(client)
+
+    leads_notify_time = datetime.utcfromtimestamp(run.time) + timedelta(minutes=LEADS_TIME_DELTA)
+    scheduler.add_job(notify_closure, "date", run_date=leads_notify_time)
+    return
 
 
 # generate the roster's buttons
@@ -357,4 +437,5 @@ async def request_new_run(client, message, time):
                                 f"scheduled for <t:{run.time}:F> (<t:{run.time}:R>)."))
     signup_channel = client.get_channel(SIGNUP_CHANNEL_ID)
     await run.send_embed_messages(signup_channel)
+    schedule_run(client, run)
     save_runs()

@@ -5,7 +5,6 @@ import discord
 
 import run_manager as rm
 
-
 async def on_ready(client):
     print('We have logged in as {0.user}'.format(client))
     for run in rm.future_runs:
@@ -21,8 +20,10 @@ async def on_message(client, message):
         m = re.search("[0-9]{8,}", message.content)
         if m is None:
             await message.channel.send("Expected argument: time (use Unix time)")
-        time = m.group(0)
+        time = int(m.group(0))
         await rm.request_new_run(client, message, time)
+    if message.content.startswith("!cancel"):
+        return
 
 
 async def on_click_lead(client, i: discord.Interaction, button, element):
@@ -32,7 +33,7 @@ async def on_click_lead(client, i: discord.Interaction, button, element):
         print("run not found when trying to click party lead button")
         await i.defer()
     else:
-        if run.register_party_lead(i.user_id, element):
+        if await run.register_party_lead(i, element):
             task1 = asyncio.create_task(i.edit(embed=run.generate_embed_overview()))
             task2 = asyncio.create_task(rm.update_embed(client, run, overview=False))
             await task1
@@ -49,7 +50,7 @@ async def on_click_party(client, i: discord.Interaction, button, element):
         print("run not found when trying to click party join button")
         await i.defer()
     else:
-        if run.register_party_member(i.user_id, element):
+        if await run.register_party_member(i, element):
             task1 = asyncio.create_task(i.edit(embed=run.generate_embed_roster()))
             task2 = asyncio.create_task(rm.update_embed(client, run))
             await task1

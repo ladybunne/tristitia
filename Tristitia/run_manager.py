@@ -2,23 +2,23 @@ import discord
 from discord import ActionRow, Button, ButtonStyle
 import pickle
 
-start_index = 2
+START_INDEX = 2
 future_runs = []
 past_runs = []
-max_party_size = 8
+MAX_PARTY_SIZE = 8
 
-future_runs_filename = "future_runs.pk"
-past_runs_filename = "past_runs.pk"
+FUTURE_RUNS_FILENAME = "future_runs.pk"
+PAST_RUNS_FILENAME = "past_runs.pk"
 
 # I know support and reserve aren't *actual* elements.
-elements = ["earth", "wind", "water", "fire", "lightning", "ice", "support", "reserve"]
+ELEMENTS = ["earth", "wind", "water", "fire", "lightning", "ice", "support", "reserve"]
 
 # The Fire Place specific values
 
-guild_id = 931496853873238046
-signup_channel_id = 943732635597963294
+GUILD_ID = 931496853873238046
+SIGNUP_CHANNEL_ID = 943732635597963294
 
-icons = {
+ICONS = {
     "earth": "<:earthicon:941933371532148796>",
     "wind": "<:windicon:941933393241849867>",
     "water": "<:watericon:941933336031543336>",
@@ -29,7 +29,7 @@ icons = {
     "reserve": ""
 }
 
-hexes = {
+HEXES = {
     "earth": "<:earthhex:941931780108345355>",
     "wind": "<:windhex:941931797917347960>",
     "water": "<:waterhex:941931742107934810>",
@@ -40,13 +40,13 @@ hexes = {
     "reserve": ""
 }
 
-element_button_styles = {
+ELEMENT_BUTTON_STYLES = {
     "earth": ButtonStyle.grey, "wind": ButtonStyle.grey, "water": ButtonStyle.grey,
     "fire": ButtonStyle.grey, "lightning": ButtonStyle.grey, "ice": ButtonStyle.grey,
     "support": ButtonStyle.blurple, "reserve": ButtonStyle.green,
 }
 
-sp_emoji = "<:sp:944158078440456233>"
+SP_EMOJI = "<:sp:944158078440456233>"
 
 class Run:
     def __init__(self, run_id, raid_lead, time):
@@ -80,7 +80,7 @@ class Run:
     def format_party_title(self, element):
         if element == "reserve":
             return f"Reserves ({self.calculate_party_members(element)})"
-        return f"{icons[element]} {element.capitalize()} ({self.calculate_party_members(element)}/{max_party_size})"
+        return f"{ICONS[element]} {element.capitalize()} ({self.calculate_party_members(element)}/{MAX_PARTY_SIZE})"
 
     # format a party's list of members
     def format_party_list(self, element):
@@ -99,13 +99,8 @@ class Run:
     def generate_embed_overview(self):
         embed = discord.Embed()
 
-        # old leads list method (one big list)
-        # leads_list = ""
-        # for element in elements[:-1]:
-        #     leads_list += f"\n{hexes[element]}{self.format_lead(element)}"
-
         def lead(element):
-            return f"{hexes[element]}{self.format_lead(element)}"
+            return f"{HEXES[element]}{self.format_lead(element)}"
 
         leads_list = (f"\n{lead('earth')} {lead('wind')} {lead('water')}\n"
                       f"{lead('fire')} {lead('lightning')} {lead('ice')}\n"
@@ -123,19 +118,19 @@ class Run:
         embed = discord.Embed()
         embed.title = f"Run ID: #{self.run_id} - Roster"
         embed.description = (f"**Raid Lead**: <@{self.raid_lead}>\n"
-                             f"**Time**: <t:{self.time}:F>, <t:{self.time}:R>\n{sp_emoji}")
-        for e in elements:
+                             f"**Time**: <t:{self.time}:F>, <t:{self.time}:R>\n{SP_EMOJI}")
+        for e in ELEMENTS:
             embed.add_field(name=self.format_party_title(e), value=self.format_party_list(e))
         return embed
 
     # generate the overview's buttons
     def generate_overview_buttons(self):
         button_list = []
-        for e in elements[:-1]:
+        for e in ELEMENTS[:-1]:
             button_list.append(Button(label=f"{e} lead".title(),
                                       custom_id=e + "_lead",
-                                      style=element_button_styles[e],
-                                      emoji=hexes[e]))
+                                      style=ELEMENT_BUTTON_STYLES[e],
+                                      emoji=HEXES[e]))
         row_1 = button_list[:3] + [button_list[-1]]
         row_2 = button_list[3:6]
         return [row_1, row_2]
@@ -143,11 +138,11 @@ class Run:
     # generate the roster's buttons
     def generate_roster_buttons(self):
         button_list = []
-        for e in elements:
+        for e in ELEMENTS:
             button_list.append(Button(label=f"{e} Party".title() if e != "reserve" else "Reserves",
                                       custom_id=e + "_party",
-                                      style=element_button_styles[e],
-                                      emoji=icons[e] if e != "reserve" else None))
+                                      style=ELEMENT_BUTTON_STYLES[e],
+                                      emoji=ICONS[e] if e != "reserve" else None))
         row_1 = button_list[:3] + [button_list[-2]]
         row_2 = button_list[3:6] + [button_list[-1]]
         return [row_1, row_2]
@@ -157,13 +152,13 @@ class Run:
         return
 
     def check_current_lead(self, user_id):
-        for e in elements[:-1]:
+        for e in ELEMENTS[:-1]:
             if user_id == self.leads[e]:
                 return e
         return None
 
     def check_current_party(self, user_id):
-        for e in elements:
+        for e in ELEMENTS:
             if user_id in self.roster[e]:
                 return e
         return None
@@ -187,7 +182,7 @@ class Run:
     def party_add(self, user_id, element):
         if user_id not in self.roster[element]:
             # -1 is because of leads
-            if len(self.roster[element]) < max_party_size - 1:
+            if len(self.roster[element]) < MAX_PARTY_SIZE - 1:
                 self.roster[element].append(user_id)
                 return True
             else:
@@ -267,23 +262,14 @@ class Run:
         return changed
 
 
-# startup
-try:
-    future_file = open(future_runs_filename, "rb")
-    future_runs = pickle.load(future_file)
-    future_file.close()
-except IOError:
-    print("Unable to load stored runs.")
-
-
 def make_new_run(raid_lead, time):
-    run_id = start_index + len(future_runs) + len(past_runs)
+    run_id = START_INDEX + len(future_runs) + len(past_runs)
     future_runs.append(Run(run_id, raid_lead, time))
     return future_runs[-1]
 
 
 def save_runs():
-    future_file = open(future_runs_filename, "wb")
+    future_file = open(FUTURE_RUNS_FILENAME, "wb")
     pickle.dump(future_runs, future_file)
     future_file.close()
 
@@ -300,17 +286,15 @@ def get_run_from_interaction(i: discord.Interaction):
 
     return None
 
-# make this way better at some point
-
 
 async def update_overview_embed(client, run):
-    signup_channel = client.get_guild(guild_id).get_channel(signup_channel_id)
+    signup_channel = client.get_guild(GUILD_ID).get_channel(SIGNUP_CHANNEL_ID)
     overview_message = await signup_channel.fetch_message(run.overview_message_id)
     await overview_message.edit(embed=run.generate_embed_overview())
 
 
 async def update_roster_embed(client, run):
-    signup_channel = client.get_guild(guild_id).get_channel(signup_channel_id)
+    signup_channel = client.get_guild(GUILD_ID).get_channel(SIGNUP_CHANNEL_ID)
     roster_message = await signup_channel.fetch_message(run.roster_message_id)
     await roster_message.edit(embed=run.generate_embed_roster())
 
@@ -319,7 +303,7 @@ async def request_new_run(client, message, time):
     run = make_new_run(message.author.id, time)
     await message.channel.send((f"Created run with ID #{run.run_id}, led by <@{run.raid_lead}>, "
                                 f"scheduled for <t:{run.time}:F> (<t:{run.time}:R>)."))
-    signup_channel = client.get_channel(signup_channel_id)
+    signup_channel = client.get_channel(SIGNUP_CHANNEL_ID)
     overview_message = await signup_channel.send(embed=run.generate_embed_overview(),
                                                  components=run.generate_overview_buttons())
     roster_message = await signup_channel.send(embed=run.generate_embed_roster(),
@@ -327,3 +311,12 @@ async def request_new_run(client, message, time):
     run.overview_message_id = overview_message.id
     run.roster_message_id = roster_message.id
     save_runs()
+
+
+# startup
+try:
+    future_file = open(FUTURE_RUNS_FILENAME, "rb")
+    future_runs = pickle.load(future_file)
+    future_file.close()
+except IOError:
+    print("Unable to load stored runs.")

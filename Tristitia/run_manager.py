@@ -27,7 +27,8 @@ scheduler.start()
 random.seed()
 
 # I know support and reserve aren't *actual* elements.
-ELEMENTS = ["earth", "wind", "water", "fire", "lightning", "ice", "support", "reserve"]
+ELEMENTS = [EARTH, WIND, WATER, FIRE, LIGHTNING, ICE, SUPPORT, RESERVE] = \
+    "earth", "wind", "water", "fire", "lightning", "ice", "support", "reserve"
 
 MSG_PARTY_LEAD_SWAP_TO_MEMBER = (
     "**Unable to join {icon}{element_party} Party**. You are currently registered as **{hex}{element_lead} Lead**.\n"
@@ -76,7 +77,7 @@ MSG_NOTIFY_RESERVES = (
     "If any parties are still up, they'll be under Private in the Party Finder. They should be listed under "
     "Adventuring Forays -> Eureka Hydatos, with the element in the description.\n\n"
     
-    "Act quick! There's no guarantee that there _are_ open spots. If there aren't, I'm deeply sorry!\n"
+    "Act quick! There's no guarantee that there _are_ open spots. If there aren't, I'm sorry!\n"
     "Please still come into the instance either way - having people on hand is always helpful, and who knows? "
     "You might end up on the run after all, if emergency fills are needed!\n\n"
 
@@ -84,6 +85,7 @@ MSG_NOTIFY_RESERVES = (
 )
 
 MSG_PARTY_THREAD_NAME = "Run {run_id} - {element} Party"
+MSG_RESERVES_THREAD_NAME = "Run {run_id} - Reserves and Public"
 
 # The Fire Place specific values
 
@@ -91,31 +93,31 @@ GUILD_ID = 931496853873238046
 SIGNUP_CHANNEL_ID = 943732635597963294
 
 ICONS = {
-    "earth": "<:earthicon:941933371532148796>",
-    "wind": "<:windicon:941933393241849867>",
-    "water": "<:watericon:941933336031543336>",
-    "fire": "<:fireicon:941933428251717692>",
-    "lightning": "<:lightningicon:941933355719593994>",
-    "ice": "<:iceicon:941933411990401044>",
-    "support": "ℹ️",
-    "reserve": ""
+    EARTH: "<:earthicon:941933371532148796>",
+    WIND: "<:windicon:941933393241849867>",
+    WATER: "<:watericon:941933336031543336>",
+    FIRE: "<:fireicon:941933428251717692>",
+    LIGHTNING: "<:lightningicon:941933355719593994>",
+    ICE: "<:iceicon:941933411990401044>",
+    SUPPORT: "ℹ️",
+    RESERVE: ""
 }
 
 HEXES = {
-    "earth": "<:earthhex:941931780108345355>",
-    "wind": "<:windhex:941931797917347960>",
-    "water": "<:waterhex:941931742107934810>",
-    "fire": "<:firehex:941931847129108521>",
-    "lightning": "<:lightninghex:941931762009931826>",
-    "ice": "<:icehex:941931833275342929>",
-    "support": "ℹ️",
-    "reserve": ""
+    EARTH: "<:earthhex:941931780108345355>",
+    WIND: "<:windhex:941931797917347960>",
+    WATER: "<:waterhex:941931742107934810>",
+    FIRE: "<:firehex:941931847129108521>",
+    LIGHTNING: "<:lightninghex:941931762009931826>",
+    ICE: "<:icehex:941931833275342929>",
+    SUPPORT: "ℹ️",
+    RESERVE: ""
 }
 
 ELEMENT_BUTTON_STYLES = {
-    "earth": ButtonStyle.grey, "wind": ButtonStyle.grey, "water": ButtonStyle.grey,
-    "fire": ButtonStyle.grey, "lightning": ButtonStyle.grey, "ice": ButtonStyle.grey,
-    "support": ButtonStyle.blurple, "reserve": ButtonStyle.green,
+    EARTH: ButtonStyle.grey, WIND: ButtonStyle.grey, WATER: ButtonStyle.grey,
+    FIRE: ButtonStyle.grey, LIGHTNING: ButtonStyle.grey, ICE: ButtonStyle.grey,
+    SUPPORT: ButtonStyle.blurple, RESERVE: ButtonStyle.green,
 }
 
 SP_EMOJI = "<:sp:944158078440456233>"
@@ -129,18 +131,21 @@ class Run:
         self.overview_message_id = None
         self.roster_message_id = None
         self.leads = {
-            "earth": None, "wind": None, "water": None, "fire": None, "lightning": None, "ice": None, "support": None
+            EARTH: None, WIND: None, WATER: None, FIRE: None, LIGHTNING: None, ICE: None, SUPPORT: None
         }
         self.roster = {
-            "earth": [], "wind": [], "water": [], "fire": [], "lightning": [], "ice": [], "support": [], "reserve": []
+            EARTH: [], WIND: [], WATER: [], FIRE: [], LIGHTNING: [], ICE: [], SUPPORT: [], RESERVE: []
         }
         self.passwords = {
-            "earth": None, "wind": None, "water": None, "fire": None, "lightning": None, "ice": None, "support": None
+            EARTH: "", WIND: "", WATER: "", FIRE: "", LIGHTNING: "", ICE: "", SUPPORT: ""
         }
         self.threads = {
-            "earth": None, "wind": None, "water": None, "fire": None, "lightning": None, "ice": None,
-            "support": None, "reserve": None
+            EARTH: None, WIND: None, WATER: None, FIRE: None, LIGHTNING: None, ICE: None,
+            SUPPORT: None, RESERVE: None
         }
+        self.lock_leads = False
+        self.lock_members = False
+        self.lock_reserves = False
 
     # format party lead string for use in Overview (either None or <@ID>)
     def format_lead(self, element):
@@ -150,12 +155,12 @@ class Run:
 
     # caluclate no. of party members (used in roster field title display)
     def calculate_party_members(self, element):
-        lead = 0 if element == "reserve" or self.leads[element] is None else 1
+        lead = 0 if element == RESERVE or self.leads[element] is None else 1
         return lead + len(self.roster[element])
 
     # format party title (for roster menu)
     def format_party_title(self, element):
-        if element == "reserve":
+        if element == RESERVE:
             return f"Reserves ({self.calculate_party_members(element)})"
 
         party_count = f"{self.calculate_party_members(element)}/{MAX_PARTY_SIZE}"
@@ -169,14 +174,14 @@ class Run:
     # format a party's list of members
     def format_party_list(self, element):
         party_list = ""
-        if element != "reserve" and self.leads[element] is not None:
+        if element != RESERVE and self.leads[element] is not None:
             party_list = f"⭐<@{self.leads[element]}>"
         if len(self.roster[element]) > 0:
             party_list += "\n"
         for user_id in self.roster[element]:
             party_list += f"<@{user_id}>"
             if len(self.roster[element]) == 0 or self.roster[element][-1] != user_id:
-                party_list += "\n" if element != "reserve" else ", "
+                party_list += "\n" if element != RESERVE else ", "
         if party_list == "":
             party_list = "None"
         return party_list
@@ -207,9 +212,9 @@ class Run:
         def lead(element):
             return f"{HEXES[element]}{self.format_lead(element)}"
 
-        leads_list = (f"\n{lead('earth')} {lead('wind')} {lead('water')}\n"
-                      f"{lead('fire')} {lead('lightning')} {lead('ice')}\n"
-                      f"{lead('support')}")
+        leads_list = (f"\n{lead(EARTH)} {lead(WIND)} {lead(WATER)}\n"
+                      f"{lead(FIRE)} {lead(LIGHTNING)} {lead(ICE)}\n"
+                      f"{lead(SUPPORT)}")
 
         embed.title = f"Run ID: #{self.run_id} - Overview"
         embed.description = (f"**Raid Lead**: <@{self.raid_lead}>\n"
@@ -241,6 +246,10 @@ class Run:
         return None
 
     def lead_add(self, user_id, element):
+        # respect locks
+        if self.lock_leads:
+            return False
+
         if self.leads[element] is None:
             self.leads[element] = user_id
             return True
@@ -249,6 +258,10 @@ class Run:
             return False
 
     def lead_remove(self, user_id, element):
+        # respect locks
+        if self.lock_leads:
+            return False
+
         if self.leads[element] == user_id:
             self.leads[element] = None
             return True
@@ -257,6 +270,12 @@ class Run:
             return False
 
     def party_add(self, user_id, element):
+        # respect locks
+        if element == RESERVE and self.lock_reserves:
+            return False
+        if self.lock_members:
+            return False
+
         if user_id not in self.roster[element]:
             # -1 is because of leads
             if len(self.roster[element]) < MAX_PARTY_SIZE - 1:
@@ -270,6 +289,12 @@ class Run:
             return False
 
     def party_remove(self, user_id, element):
+        # respect locks
+        if element == RESERVE and self.lock_reserves:
+            return False
+        if self.lock_members:
+            return False
+
         if user_id in self.roster[element]:
             try:
                 self.roster[element].remove(user_id)
@@ -347,11 +372,49 @@ class Run:
 
         return changed
 
+    # generate the overview's buttons
+    def generate_overview_buttons(self):
+        # remove buttons if leads are locked
+        if self.lock_leads:
+            return None
+
+        button_list = []
+        for e in ELEMENTS[:-1]:
+            button_list.append(Button(label=f"{e} lead".title(),
+                                      custom_id=e + "_lead",
+                                      style=ELEMENT_BUTTON_STYLES[e],
+                                      emoji=HEXES[e]))
+
+        row_1 = button_list[:3] + [button_list[-1]]
+        row_2 = button_list[3:6]
+        return [row_1, row_2]
+
+    # generate the roster's buttons
+    def generate_roster_buttons(self):
+        # remove all buttons if members and reserves are locked
+        if self.lock_members and self.lock_reserves:
+            return None
+
+        button_list = []
+        for e in ELEMENTS:
+            button_list.append(Button(label=f"{e} Party".title() if e != RESERVE else "Reserves",
+                                      custom_id=e + "_party",
+                                      style=ELEMENT_BUTTON_STYLES[e],
+                                      emoji=ICONS[e] if e != RESERVE else None))
+
+        # if it's just members locked, return only the reserves button
+        if self.lock_members and not self.lock_reserves:
+            return button_list[-1]
+
+        row_1 = button_list[:3] + [button_list[-2]]
+        row_2 = button_list[3:6] + [button_list[-1]]
+        return [row_1, row_2]
+
     async def send_embed_messages(self, signup_channel):
         overview_message = await signup_channel.send(embed=self.generate_embed_overview(),
-                                                     components=generate_overview_buttons())
+                                                     components=self.generate_overview_buttons())
         roster_message = await signup_channel.send(embed=self.generate_embed_roster(),
-                                                   components=generate_roster_buttons())
+                                                   components=self.generate_roster_buttons())
         self.overview_message_id = overview_message.id
         self.roster_message_id = roster_message.id
 
@@ -377,6 +440,9 @@ class Run:
                                                              time=calendar.timegm(members_notify_time.utctimetuple())))
             except:
                 print(f"unable to send DM to lead with ID: {user.id}")
+
+        self.lock_leads = True
+        save_runs()
 
     async def notify_members(self, client):
         signup_channel = client.get_guild(GUILD_ID).get_channel(SIGNUP_CHANNEL_ID)
@@ -407,16 +473,33 @@ class Run:
                                                       password=self.passwords[element],
                                                       lead=self.leads[element],
                                                       time=calendar.timegm(reserves_notify_time.utctimetuple())))
-            thread_message_json = await client.send_message_in_thread(thread["id"], message)
+            await client.send_message_in_thread(thread["id"], message)
 
+        self.lock_members = True
         save_runs()
-        return
 
     async def notify_reserves(self, client):
         signup_channel = client.get_guild(GUILD_ID).get_channel(SIGNUP_CHANNEL_ID)
 
-        # TODO do this tomorrow
-        return
+        if self.threads[RESERVE] is not None:
+            return
+
+        thread = await signup_channel.create_public_thread(name=MSG_RESERVES_THREAD_NAME.format(run_id=self.run_id),
+                                                           minutes=1440)
+
+        password_list = ""
+        for element in ELEMENTS[:-1]:
+            password_list += f"**{ICONS[element]}{element.capitalize()} Party**: **__{self.passwords[element]}__**"
+            if SUPPORT != element:
+                password_list += "\n"
+
+        message = (f"{self.format_party_list(RESERVE)}\n\n"
+                   f"{MSG_NOTIFY_RESERVES}".format(run_id=self.run_id,
+                                                   password_list=password_list))
+        await client.send_message_in_thread(thread["id"], message)
+
+        self.lock_reserves = True
+        save_runs()
 
 
 def load_runs(future=True):
@@ -464,19 +547,22 @@ def get_run_from_interaction(i: discord.Interaction):
     return None
 
 
+# update an existing embed to reflect the current state
 async def update_embed(client, run, overview=True):
     signup_channel = client.get_guild(GUILD_ID).get_channel(SIGNUP_CHANNEL_ID)
     try:
         message_id = run.overview_message_id if overview else run.roster_message_id
         message = await signup_channel.fetch_message(message_id)
         generated_embed = run.generate_embed_overview() if overview else run.generate_embed_roster()
-        await message.edit(embed=generated_embed)
+        buttons = run.generate_overview_buttons() if overview else run.generate_roster_buttons()
+        await message.edit(embed=generated_embed, components=buttons)
         return True
     except discord.errors.NotFound:
         await regenerate_embeds(client)
         return False
 
 
+# wipe the entire signups channel, then repopulate with updated embeds
 async def regenerate_embeds(client):
     signup_channel = client.get_guild(GUILD_ID).get_channel(SIGNUP_CHANNEL_ID)
 
@@ -500,12 +586,15 @@ async def regenerate_embeds(client):
 def schedule_run(client, run):
     async def notify_leads():
         await run.notify_leads(client)
+        await update_embed(client, run)
 
     async def notify_members():
         await run.notify_members(client)
+        await update_embed(client, run, overview=False)
 
     async def notify_reserves():
         await run.notify_reserves(client)
+        await update_embed(client, run, overview=False)
 
     async def post_run_cleanup():
         return
@@ -518,32 +607,6 @@ def schedule_run(client, run):
         scheduler.add_job(event[0], "date", run_date=event[1])
 
     return
-
-
-# generate the roster's buttons
-def generate_roster_buttons():
-    button_list = []
-    for e in ELEMENTS:
-        button_list.append(Button(label=f"{e} Party".title() if e != "reserve" else "Reserves",
-                                  custom_id=e + "_party",
-                                  style=ELEMENT_BUTTON_STYLES[e],
-                                  emoji=ICONS[e] if e != "reserve" else None))
-    row_1 = button_list[:3] + [button_list[-2]]
-    row_2 = button_list[3:6] + [button_list[-1]]
-    return [row_1, row_2]
-
-
-# generate the overview's buttons
-def generate_overview_buttons():
-    button_list = []
-    for e in ELEMENTS[:-1]:
-        button_list.append(Button(label=f"{e} lead".title(),
-                                  custom_id=e + "_lead",
-                                  style=ELEMENT_BUTTON_STYLES[e],
-                                  emoji=HEXES[e]))
-    row_1 = button_list[:3] + [button_list[-1]]
-    row_2 = button_list[3:6]
-    return [row_1, row_2]
 
 
 async def request_new_run(client, message, time):

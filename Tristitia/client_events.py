@@ -11,6 +11,9 @@ async def on_ready(client):
 
     for run in rm.future_runs:
         rm.schedule_run(client, run)
+        # testing
+        await run.notify_leads(client)
+        await run.notify_members(client)
         if await rm.update_embed(client, run):
             await rm.update_embed(client, run, overview=False)
 

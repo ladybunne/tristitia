@@ -1,10 +1,64 @@
 import discord
+import requests
 from discord.ext import commands
 import logging
 
 import client_events as ce
 
 logging.basicConfig(level=logging.INFO)
+
+
+async def create_public_thread(self, name, minutes):
+    token = 'Bot ' + self._state.http.token
+    url = f"https://discord.com/api/v9/channels/{self.id}/threads"
+    headers = {
+        "authorization": token,
+        "content-type": "application/json"
+    }
+    data = {
+        "name": name,
+        "type": 11,
+        "auto_archive_duration": minutes
+    }
+
+    return requests.post(url, headers=headers, json=data).json()
+
+
+async def create_private_thread(self, name, minutes):
+    token = 'Bot ' + self._state.http.token
+    url = f"https://discord.com/api/v9/channels/{self.id}/threads"
+    headers = {
+        "authorization": token,
+        "content-type": "application/json"
+    }
+    data = {
+        "name": name,
+        "type": 12,
+        "auto_archive_duration": minutes
+    }
+
+    return requests.post(url, headers=headers, json=data).json()
+
+
+async def send_message_in_thread(self, channel_id, message):
+    token = 'Bot ' + self.http.token
+    url = f"https://discord.com/api/v9/channels/{channel_id}/messages"
+    headers = {
+        "authorization": token,
+        "content-type": "application/json"
+    }
+    data = {
+        "channel_id": channel_id,
+        "type": 0,
+        "content": message
+    }
+
+    return requests.post(url, headers=headers, json=data).json()
+
+
+discord.TextChannel.create_public_thread = create_public_thread
+discord.TextChannel.create_private_thread = create_private_thread
+commands.Bot.send_message_in_thread = send_message_in_thread
 
 client = commands.Bot(command_prefix=commands.when_mentioned_or('!'))
 

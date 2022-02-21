@@ -2,6 +2,7 @@ import calendar
 
 import discord
 import jsonpickle
+import random
 from datetime import datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
@@ -22,32 +23,67 @@ RESERVES_TIME_DELTA = 1
 scheduler = AsyncIOScheduler(timezone="utc")
 scheduler.start()
 
+# randomiser for passwords
+random.seed()
+
 # I know support and reserve aren't *actual* elements.
 ELEMENTS = ["earth", "wind", "water", "fire", "lightning", "ice", "support", "reserve"]
 
 MSG_PARTY_LEAD_SWAP_TO_MEMBER = (
-    "**Unable to join {icon}{element_party} Party**. You are currently registered as {hex}{element_lead} Lead.\n"
-    "Please unregister from the lead position, by clicking the button again, if you "
-    "wish to be able to join parties as a non-lead."
+    "**Unable to join {icon}{element_party} Party**. You are currently registered as **{hex}{element_lead} Lead**.\n"
+    "Please unregister from the lead position, by clicking the button again, if you wish to join a party as a non-lead."
 )
 
 MSG_NOTIFY_LEADS = (
-    "Hello, **{hex}{element} Lead** of Run #{run_id}! It's time to put up your party!\n"
+    "Hello, Run #{run_id}'s **{hex}{element} Lead**! It's time to put up your party!\n"
     "**The password for your party ({element}) is __{password}__**.\n\n"
+    
     "Please put up your party ASAP, with the above password, under Adventuring Forays -> Eureka Hydatos.\n"
     "Copy this text and use it for the party description:\n"
     "```The Fire Place vs BA, Run #{run_id} - {element} Party```\n"
-    "Please also ensure you have, in total, **1 tank**, **2 healers** and **5 any** slots listed, minus yourself.\n"
+    
+    "Please ensure you have, in total, **1 tank**, **2 healers** and **5 any** slots listed, minus yourself.\n"
+    "Leave all other settings untouched.\n\n"
+    
     "Party members will receive passwords <t:{time}:R>, at <t:{time}:F>. "
-    "Please ensure your party is up and configured by then!\n\n"
-    "If you have any questions, please DM Athena (<@97139537569910784>)! Thank you!"
+    "Please have your party up and configured by then!\n\n"
+    
+    "If you have any questions about this process, please DM Athena (<@97139537569910784>)! Thank you!"
 )
 
 MSG_NOTIFY_MEMBERS = (
-    "Hello, member of **{icon}{element} Party**, for Run #{run_id}! It's time to join your party!\n"
+    "Hello, members of Run #{run_id}'s **{icon}{element} Party**! It's time to join your party!\n"
     "**The password for your party ({element}) is __{password}__**.\n\n"
-    "Please look under Private in the Party Finder for your party. It should be listed under <@{4}>."
+    
+    "Please look under Private in the Party Finder for your party. It should be listed under Adventuring Forays -> "
+    "Eureka Hydatos, with **{icon}{element}** as the listed element and <@{lead}> as the party lead.\n\n"
+    
+    "Please try and join before <t:{time}:F>, <t:{time}:R> - reserves will receive all passwords at that time!\n"
+    "If you are able, please join as a **tank** or **healer** - BA can't happen without them!\n\n"
+    
+    "If you need help, feel free to ask here in this thread. your lead (<@{lead}>) should see it. "
+    "If it's urgent, ping them!\n\n"
+    
+    "If you have any questions about this process, please DM Athena! Thank you!"
 )
+
+MSG_NOTIFY_RESERVES = (
+    "Hello, reserves of Run #{run_id}! It's your time to shine!\n"
+    "Below are the passwords to **ALL parties**. With these, you can fill any remaining spots! Go go!\n\n"
+    
+    "{password_list}\n\n"
+    
+    "If any parties are still up, they'll be under Private in the Party Finder. They should be listed under "
+    "Adventuring Forays -> Eureka Hydatos, with the element in the description.\n\n"
+    
+    "Act quick! There's no guarantee that there _are_ open spots. If there aren't, I'm deeply sorry!\n"
+    "Please still come into the instance either way - having people on hand is always helpful, and who knows? "
+    "You might end up on the run after all, if emergency fills are needed!\n\n"
+
+    "If you have any questions about this process, please DM Athena! Thank you!"
+)
+
+MSG_PARTY_THREAD_NAME = "Run {run_id} - {element} Party"
 
 # The Fire Place specific values
 
@@ -101,6 +137,10 @@ class Run:
         self.passwords = {
             "earth": None, "wind": None, "water": None, "fire": None, "lightning": None, "ice": None, "support": None
         }
+        self.threads = {
+            "earth": None, "wind": None, "water": None, "fire": None, "lightning": None, "ice": None,
+            "support": None, "reserve": None
+        }
 
     # format party lead string for use in Overview (either None or <@ID>)
     def format_lead(self, element):
@@ -130,7 +170,9 @@ class Run:
     def format_party_list(self, element):
         party_list = ""
         if element != "reserve" and self.leads[element] is not None:
-            party_list = f"⭐<@{self.leads[element]}>\n"
+            party_list = f"⭐<@{self.leads[element]}>"
+        if len(self.roster[element]) > 0:
+            party_list += "\n"
         for user_id in self.roster[element]:
             party_list += f"<@{user_id}>"
             if len(self.roster[element]) == 0 or self.roster[element][-1] != user_id:
@@ -138,6 +180,25 @@ class Run:
         if party_list == "":
             party_list = "None"
         return party_list
+
+    def leads_notify_time(self):
+        return datetime.utcfromtimestamp(self.time) + timedelta(minutes=LEADS_TIME_DELTA)
+
+    def members_notify_time(self):
+        return datetime.utcfromtimestamp(self.time) + timedelta(minutes=MEMBERS_TIME_DELTA)
+
+    def reserves_notify_time(self):
+        return datetime.utcfromtimestamp(self.time) + timedelta(minutes=RESERVES_TIME_DELTA)
+
+    def generate_passwords(self):
+        def generate_password():
+            password = ""
+            for _ in range(4):
+                password += str(random.randrange(10))
+            return password
+
+        for element in self.passwords:
+            self.passwords[element] = generate_password()
 
     # generate the overview embed
     def generate_embed_overview(self):
@@ -295,7 +356,7 @@ class Run:
         self.roster_message_id = roster_message.id
 
     async def notify_leads(self, client):
-        members_notify_time = datetime.utcfromtimestamp(self.time) + timedelta(minutes=MEMBERS_TIME_DELTA)
+        members_notify_time = self.members_notify_time()
 
         for element in ELEMENTS[:-1]:
             # generate passwords now!
@@ -312,25 +373,49 @@ class Run:
                 await user.send(f"{MSG_NOTIFY_LEADS}".format(hex=HEXES[element],
                                                              element=element.capitalize(),
                                                              run_id=self.run_id,
-                                                             password="1111",
+                                                             password=self.passwords[element],
                                                              time=calendar.timegm(members_notify_time.utctimetuple())))
             except:
                 print(f"unable to send DM to lead with ID: {user.id}")
 
-        # schedule notify_members at members_notify_time
-        return
-
     async def notify_members(self, client):
-        reserves_notify_time = datetime.utcfromtimestamp(self.time) + timedelta(minutes=RESERVES_TIME_DELTA)
+        signup_channel = client.get_guild(GUILD_ID).get_channel(SIGNUP_CHANNEL_ID)
+        reserves_notify_time = self.reserves_notify_time()
+
+        # if even a single thread exists, this has likely already happened
+        for existing_thread in self.threads.values():
+            if existing_thread is not None:
+                return
 
         # private threads for this
-        # failing that, DMs
         for element in ELEMENTS[:-1]:
-            for party_member in self.roster[element]:
-                user = await client.fetch_user(self.leads[element])
+            # if roster is totally empty, skip it
+            if self.leads[element] is None and not self.roster[element]:
+                continue
+
+            # create thread
+            thread = await signup_channel.create_private_thread(name=MSG_PARTY_THREAD_NAME.
+                                                                format(element=element.capitalize(),
+                                                                       run_id=self.run_id),
+                                                                minutes=1440)
+            self.threads[element] = thread["id"]
+
+            message = (f"{self.format_party_list(element)}\n\n"
+                       f"{MSG_NOTIFY_MEMBERS}".format(icon=ICONS[element],
+                                                      element=element.capitalize(),
+                                                      run_id=self.run_id,
+                                                      password=self.passwords[element],
+                                                      lead=self.leads[element],
+                                                      time=calendar.timegm(reserves_notify_time.utctimetuple())))
+            thread_message_json = await client.send_message_in_thread(thread["id"], message)
+
+        save_runs()
         return
 
     async def notify_reserves(self, client):
+        signup_channel = client.get_guild(GUILD_ID).get_channel(SIGNUP_CHANNEL_ID)
+
+        # TODO do this tomorrow
         return
 
 
@@ -363,8 +448,11 @@ def save_runs():
 
 def make_new_run(raid_lead, time):
     run_id = START_INDEX + len(future_runs) + len(past_runs)
-    future_runs.append(Run(run_id, raid_lead, time))
-    return future_runs[-1]
+    new_run = Run(run_id, raid_lead, time)
+    new_run.generate_passwords()
+
+    future_runs.append(new_run)
+    return new_run
 
 
 def get_run_from_interaction(i: discord.Interaction):
@@ -409,13 +497,26 @@ async def regenerate_embeds(client):
         print("unable to complete embed regeneration")
 
 
-# TODO add in timing stuff for if this is run at different timing windows
 def schedule_run(client, run):
-    async def notify_closure():
+    async def notify_leads():
         await run.notify_leads(client)
 
-    leads_notify_time = datetime.utcfromtimestamp(run.time) + timedelta(minutes=LEADS_TIME_DELTA)
-    scheduler.add_job(notify_closure, "date", run_date=leads_notify_time)
+    async def notify_members():
+        await run.notify_members(client)
+
+    async def notify_reserves():
+        await run.notify_reserves(client)
+
+    async def post_run_cleanup():
+        return
+
+    events = [(notify_leads, run.leads_notify_time()),
+              (notify_members, run.members_notify_time()),
+              (notify_reserves, run.reserves_notify_time())]
+
+    for event in events:
+        scheduler.add_job(event[0], "date", run_date=event[1])
+
     return
 
 

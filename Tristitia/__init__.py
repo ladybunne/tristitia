@@ -55,7 +55,6 @@ async def send_message_in_thread(self, channel_id, message):
 
     return requests.post(url, headers=headers, json=data).json()
 
-
 discord.TextChannel.create_public_thread = create_public_thread
 discord.TextChannel.create_private_thread = create_private_thread
 commands.Bot.send_message_in_thread = send_message_in_thread

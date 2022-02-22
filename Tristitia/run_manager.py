@@ -14,10 +14,11 @@ MAX_PARTY_SIZE = 8
 FUTURE_RUNS_FILENAME = "future_runs.json"
 PAST_RUNS_FILENAME = "past_runs.json"
 
-# -15, 0, 10
+# -15, 0, 10, 180
 LEADS_TIME_DELTA = -1
 MEMBERS_TIME_DELTA = 0
 RESERVES_TIME_DELTA = 1
+FINISH_TIME_DELTA = 2
 
 # async events to notify people of passwords and stuff
 scheduler = AsyncIOScheduler(timezone="utc")
@@ -36,7 +37,7 @@ MSG_PARTY_LEAD_SWAP_TO_MEMBER = (
 )
 
 MSG_NOTIFY_LEADS = (
-    "Hello, Run #{run_id}'s **{hex}{element} Lead**! It's time to put up your party!\n"
+    "Hello, <@{user_id}>! You are Run #{run_id}'s **{hex}{element} Lead**. It's time to put up your party!\n"
     "**The password for your party ({element}) is __{password}__**.\n\n"
     
     "Please put up your party ASAP, with the above password, under Adventuring Forays -> Eureka Hydatos.\n"
@@ -77,7 +78,7 @@ MSG_NOTIFY_RESERVES = (
     "If any parties are still up, they'll be under Private in the Party Finder. They should be listed under "
     "Adventuring Forays -> Eureka Hydatos, with the element in the description.\n\n"
     
-    "Act quick! There's no guarantee that there _are_ open spots. If there aren't, I'm sorry!\n"
+    "Act now! There's no guarantee that there _are_ open spots. If there aren't, I'm sorry!\n"
     "Please still come into the instance either way - having people on hand is always helpful, and who knows? "
     "You might end up on the run after all, if emergency fills are needed!\n\n"
 
@@ -130,6 +131,7 @@ class Run:
         self.time = time
         self.overview_message_id = None
         self.roster_message_id = None
+        self.reserve_thread_create_message_id = None
         self.leads = {
             EARTH: None, WIND: None, WATER: None, FIRE: None, LIGHTNING: None, ICE: None, SUPPORT: None
         }
@@ -146,6 +148,7 @@ class Run:
         self.lock_leads = False
         self.lock_members = False
         self.lock_reserves = False
+        self.finished = False
 
     # format party lead string for use in Overview (either None or <@ID>)
     def format_lead(self, element):
@@ -194,6 +197,9 @@ class Run:
 
     def reserves_notify_time(self):
         return datetime.utcfromtimestamp(self.time) + timedelta(minutes=RESERVES_TIME_DELTA)
+
+    def finish_time(self):
+        return datetime.utcfromtimestamp(self.time) + timedelta(minutes=FINISH_TIME_DELTA)
 
     def generate_passwords(self):
         def generate_password():
@@ -376,7 +382,7 @@ class Run:
     def generate_overview_buttons(self):
         # remove buttons if leads are locked
         if self.lock_leads:
-            return None
+            return []
 
         button_list = []
         for e in ELEMENTS[:-1]:
@@ -393,7 +399,7 @@ class Run:
     def generate_roster_buttons(self):
         # remove all buttons if members and reserves are locked
         if self.lock_members and self.lock_reserves:
-            return None
+            return []
 
         button_list = []
         for e in ELEMENTS:
@@ -404,7 +410,7 @@ class Run:
 
         # if it's just members locked, return only the reserves button
         if self.lock_members and not self.lock_reserves:
-            return button_list[-1]
+            return [button_list[-1]]
 
         row_1 = button_list[:3] + [button_list[-2]]
         row_2 = button_list[3:6] + [button_list[-1]]
@@ -433,7 +439,8 @@ class Run:
                 continue
 
             try:
-                await user.send(f"{MSG_NOTIFY_LEADS}".format(hex=HEXES[element],
+                await user.send(f"{MSG_NOTIFY_LEADS}".format(user_id=user.id,
+                                                             hex=HEXES[element],
                                                              element=element.capitalize(),
                                                              run_id=self.run_id,
                                                              password=self.passwords[element],
@@ -463,7 +470,7 @@ class Run:
             thread = await signup_channel.create_private_thread(name=MSG_PARTY_THREAD_NAME.
                                                                 format(element=element.capitalize(),
                                                                        run_id=self.run_id),
-                                                                minutes=1440)
+                                                                minutes=60)
             self.threads[element] = thread["id"]
 
             message = (f"{self.format_party_list(element)}\n\n"
@@ -485,7 +492,12 @@ class Run:
             return
 
         thread = await signup_channel.create_public_thread(name=MSG_RESERVES_THREAD_NAME.format(run_id=self.run_id),
-                                                           minutes=1440)
+                                                           minutes=60)
+        self.threads[RESERVE] = thread["id"]
+
+        # delete "thread created" message
+        self.reserve_thread_create_message_id = signup_channel.last_message_id
+        print(self.reserve_thread_create_message_id)
 
         password_list = ""
         for element in ELEMENTS[:-1]:
@@ -500,6 +512,24 @@ class Run:
 
         self.lock_reserves = True
         save_runs()
+
+    async def finish(self, client):
+        signup_channel = client.get_guild(GUILD_ID).get_channel(SIGNUP_CHANNEL_ID)
+
+        try:
+            overview_message = await signup_channel.fetch_message(self.overview_message_id)
+            roster_message = await signup_channel.fetch_message(self.roster_message_id)
+            reserve_thread_create_message = await signup_channel.fetch_message(self.reserve_thread_create_message_id)
+
+            await overview_message.delete()
+            await roster_message.delete()
+            await reserve_thread_create_message.delete()
+        except:
+            print("embed deletion failed")
+
+        self.overview_message_id = None
+        self.roster_message_id = None
+        self.finished = True
 
 
 def load_runs(future=True):
@@ -583,7 +613,7 @@ async def regenerate_embeds(client):
         print("unable to complete embed regeneration")
 
 
-def schedule_run(client, run):
+def schedule_run(client, run: Run):
     async def notify_leads():
         await run.notify_leads(client)
         await update_embed(client, run)
@@ -597,16 +627,26 @@ def schedule_run(client, run):
         await update_embed(client, run, overview=False)
 
     async def post_run_cleanup():
+        await run.finish(client)
+        archive_run(run)
         return
 
     events = [(notify_leads, run.leads_notify_time()),
               (notify_members, run.members_notify_time()),
-              (notify_reserves, run.reserves_notify_time())]
+              (notify_reserves, run.reserves_notify_time()),
+              (post_run_cleanup, run.finish_time())]
 
     for event in events:
         scheduler.add_job(event[0], "date", run_date=event[1])
 
     return
+
+
+# only run this after run.finish()!
+def archive_run(run):
+    past_runs.append(run)
+    future_runs.remove(run)
+    save_runs()
 
 
 async def request_new_run(client, message, time):

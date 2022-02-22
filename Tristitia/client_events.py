@@ -14,8 +14,8 @@ async def on_ready(client):
         # testing
         # await run.notify_leads(client)
         # await run.notify_members(client)
-        await run.notify_reserves(client)
-        await run.finish(client)
+        # await run.notify_reserves(client)
+        # await run.finish(client)
         if await rm.update_embed(client, run):
             await rm.update_embed(client, run, overview=False)
 

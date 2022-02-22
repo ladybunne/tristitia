@@ -15,10 +15,10 @@ FUTURE_RUNS_FILENAME = "future_runs.json"
 PAST_RUNS_FILENAME = "past_runs.json"
 
 # -15, 0, 10, 180
-LEADS_TIME_DELTA = -1
+LEADS_TIME_DELTA = -15
 MEMBERS_TIME_DELTA = 0
-RESERVES_TIME_DELTA = 1
-FINISH_TIME_DELTA = 2
+RESERVES_TIME_DELTA = 10
+FINISH_TIME_DELTA = 180
 
 # async events to notify people of passwords and stuff
 scheduler = AsyncIOScheduler(timezone="utc")
@@ -495,9 +495,9 @@ class Run:
                                                            minutes=60)
         self.threads[RESERVE] = thread["id"]
 
-        # delete "thread created" message
-        self.reserve_thread_create_message_id = signup_channel.last_message_id
-        print(self.reserve_thread_create_message_id)
+        # this history thing is hacky, but it works
+        thread_create_message = await signup_channel.history().next()
+        self.reserve_thread_create_message_id = thread_create_message.id
 
         password_list = ""
         for element in ELEMENTS[:-1]:

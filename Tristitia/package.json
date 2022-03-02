@@ -1,0 +1,14 @@
+{
+  "name": "tristitia",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "start"
+  },
+  "author": "Ladybunne",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "discord.js": "^13.6.0"
+  }
+}

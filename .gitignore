@@ -94,6 +94,7 @@ Thumbs.db
 
 # This obviously can't be allowed.
 token.txt
+config.json
 
 # This is just local storage.
 future_runs.json

@@ -10,5 +10,8 @@
   "license": "UNLICENSED",
   "dependencies": {
     "discord.js": "^13.6.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.10.0"
   }
 }

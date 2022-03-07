@@ -1,5 +1,6 @@
 const { startIndex } = require('../config.json');
 
+// not persistent yet, do that later
 const futureRuns = [];
 const pastRuns = [];
 const cancelledRuns = [];
@@ -30,7 +31,9 @@ class BARun {
 			earth: [], wind: [], water: [], fire: [], lightning: [], ice: [], support: [], reserve: [],
 		};
 		this.passwords = {
-			earth: null, wind: null, water: null, fire: null, lightning: null, ice: null, support: null, reserve: null,
+			earth: this.generatePassword(), wind: this.generatePassword(), water: this.generatePassword(),
+			fire: this.generatePassword(), lightning: this.generatePassword(), ice: this.generatePassword(),
+			support: this.generatePassword(),
 		};
 		this.threads = {
 			earth: null, wind: null, water: null, fire: null, lightning: null, ice: null, support: null, reserve: null,
@@ -49,17 +52,13 @@ class BARun {
 		return `Cancelled run #${this.runId}, previously scheduled for scheduled for <t:${this.time}:F> (<t:${this.time}:R>).`;
 	}
 
-	generatePasswords() {
-		function generatePassword() {
-			let password = '';
-			for (let i = 0; i < 4; i++) {
-				password += Math.floor(Math.random() * 10);
-			}
-			return password;
+	// generate a password from 0000 to 9999
+	generatePassword() {
+		let password = '';
+		for (let i = 0; i < 4; i++) {
+			password += Math.floor(Math.random() * 10);
 		}
-		elements.array.forEach(element => {
-			this.passwords[element] = generatePassword();
-		});
+		return password;
 	}
 }
 

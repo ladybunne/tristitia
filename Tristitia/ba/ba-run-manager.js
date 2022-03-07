@@ -1,4 +1,7 @@
-const { startIndex } = require('../config.json');
+const _ = require('lodash');
+const { sprintf } = require('sprintf-js');
+const { MessageEmbed } = require('discord.js');
+const { startIndex, icons, hexes, spEmoji } = require('../config.json');
 
 // not persistent yet, do that later
 const futureRuns = [];
@@ -15,6 +18,12 @@ const elements = {
 	support: 'support',
 	reserve: 'reserve',
 };
+
+const msgCreationText = 'Created run #%(id)s, led by %(raidLead)s, scheduled for <t:%(time)s:F>, <t:%(time)s:R>.';
+const msgCancelText = 'Cancelled run #%(id)s, previously scheduled for <t:%(time)s:F>, <t:%(time)s:R>.';
+
+const msgEmbedDescription = '**Raid Lead**: %(raidLead)s\n' +
+	'**Time**: <t:%(time)s:F>, <t:%(time)s:R>';
 
 class BARun {
 	constructor(raidLead, time) {
@@ -44,12 +53,61 @@ class BARun {
 		this.finished = false;
 	}
 
+	formatUser(user, mention = false) {
+		if (!user) return 'None';
+		if (mention) return `<@${user.id}>`;
+		try {
+			if (user.nickname) return user.nickname;
+			else return user.username;
+		}
+		catch (TypeException) {
+			return user.username;
+		}
+	}
+
 	get creationText() {
-		return `Created run with ID #${this.runId}, led by <@${this.raidLead}>, scheduled for <t:${this.time}:F> (<t:${this.time}:R>).`;
+		const args = { id: this.runId, raidLead: this.formatUser(this.raidLead, true), time: this.time };
+		return sprintf(msgCreationText, args);
 	}
 
 	get cancelText() {
-		return `Cancelled run #${this.runId}, previously scheduled for scheduled for <t:${this.time}:F> (<t:${this.time}:R>).`;
+		const args = { id: this.runId, time: this.time };
+		return sprintf(msgCancelText, args);
+	}
+
+	get embedOverview() {
+		const embed = new MessageEmbed()
+			.setTitle(`Run #${this.runId} - Overview`)
+			.setTimestamp()
+			.setFooter({ text: 'Some footer text here', iconURL: 'https://i.imgur.com/AfFp7pu.png' });
+
+		const descriptionArgs = { raidLead: this.formatUser(this.raidLead), time: this.time };
+		let description = sprintf(msgEmbedDescription + '**Party Leads**:\n', descriptionArgs);
+
+		// display party leads for all but reserves (no reserve lead!)
+		_.dropRight(elements.array).forEach(element => {
+			description += `${hexes[element]}${this.formatUser(this.leads[element])} `;
+		});
+
+		embed.setDescription(description);
+		return embed;
+	}
+
+	get embedRoster() {
+		const embed = new MessageEmbed()
+			.setTitle(`Run #${this.runId} - Roster`);
+
+		const descriptionArgs = { raidLead: this.formatUser(this.raidLead), time: this.time };
+		const description = sprintf(msgEmbedDescription + `\n${spEmoji}`, descriptionArgs);
+
+		embed.setDescription(description);
+
+		// party lists not implemented yet, sorry!
+		elements.array.forEach(element => {
+			embed.addField(`${icons[element]}${_.capitalize(element)} (0/8)`, '-', true);
+		});
+
+		return embed;
 	}
 
 	// generate a password from 0000 to 9999
@@ -60,43 +118,56 @@ class BARun {
 		}
 		return password;
 	}
+
+	// logic pending
+	registerPartyLead(user, element) {
+		this.leads[element] = user;
+	}
+
+	// logic pending
+	registerPartyMember(user, element) {
+		this.roster[element].push(user);
+	}
 }
 
+// create a new run, and add it to futureRuns
 function newRun(raidLead, time) {
 	const run = new BARun(raidLead, time);
 	futureRuns.push(run);
 	return run.creationText;
 }
 
+// search run arrays for a run by id
+// I tried to condense this but it ended up breaking. Not sure why.
 function lookupRunById(runId) {
 	let state = 'future';
 	let run = futureRuns.find(element => element.runId == runId);
-	if (run !== undefined) return { state, run };
+	if (run) return { state, run };
 
 	state = 'past';
 	run = pastRuns.find(element => element.runId == runId);
-	if (run !== undefined) return { state, run };
+	if (run) return { state, run };
 
 	state = 'cancelled';
 	run = cancelledRuns.find(element => element.runId == runId);
-	if (run !== undefined) return { state, run };
+	if (run) return { state, run };
 
 	return { state: 'no match', run: undefined };
 }
 
+// cancel a run, moving it from futureRuns to cancelledRuns
 function cancelRun(runId, raidLead) {
 	const lookup = lookupRunById(runId);
 	if (lookup.state == 'future') {
-		if (lookup.run.raidLead == raidLead) {
+		if (lookup.run.raidLead.id == raidLead.id) {
 			// remove run from futureRuns
-			const index = futureRuns.indexOf(lookup.run);
-			if (index > -1) futureRuns.splice(index, 1);
+			_.pull(futureRuns, lookup.run);
 
 			cancelledRuns.push(lookup.run);
 			return lookup.run.cancelText;
 		}
 		else {
-			return `You are not the raid lead of Run #${runId}, and therefore cannot cancel the run.`;
+			return `You are not the raid lead of Run #${runId}! (You can't cancel other people's runs.)`;
 		}
 	}
 	else {
@@ -104,5 +175,6 @@ function cancelRun(runId, raidLead) {
 	}
 }
 
+exports.elements = elements;
 exports.newRun = newRun;
 exports.cancelRun = cancelRun;

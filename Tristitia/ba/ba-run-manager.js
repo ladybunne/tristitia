@@ -62,22 +62,21 @@ class BARun {
 		return password;
 	}
 
-	// using GuildMembers, hence user.user.
 	formatMember(member, embellishments = false, mention = false) {
 		let output = 'None';
 		if (!member) return output;
-		if (mention) return `<@${member.user.id}>`;
+		if (mention) return `<@${member.id}>`;
 		try {
 			if (member.nickname) output = member.nickname;
-			else output = member.user.username;
+			else output = member.username;
 		}
 		catch (TypeException) {
-			output = member.user.username;
+			output = member.username;
 		}
 		if (embellishments) {
 			// add role symbol here
-			if (Object.values(this.leads).find(lead => lead.user.id == member.user.id)) output += '⭐';
-			if (member.user.id == this.raidLead.user.id) output += '👑';
+			if (Object.values(this.leads).find(lead => lead.id == member.id)) output += '⭐';
+			if (member.id == this.raidLead.id) output += '👑';
 		}
 		return output;
 	}
@@ -115,8 +114,8 @@ class BARun {
 	get embedOverview() {
 		const embed = new MessageEmbed()
 			.setTitle(`Run #${this.runId} - Overview (${this.calculateLeads}/${config.partyCount} leads)`)
-			.setColor(this.raidLead.user.hexAccentColor)
-			.setThumbnail(this.raidLead.user.displayAvatarURL());
+			.setColor(this.raidLead.hexAccentColor)
+			.setThumbnail(this.raidLead.displayAvatarURL());
 
 		const descriptionArgs = { raidLead: this.formatMember(this.raidLead), time: this.time };
 		let description = sprintf(msgEmbedDescription + '\n\n**Party Leads**:\n', descriptionArgs);
@@ -134,7 +133,7 @@ class BARun {
 		const embed = new MessageEmbed()
 			.setTitle(`Run #${this.runId} - Roster (${this.calculateAllMembers}/${config.maxPartySize * config.partyCount} members + ` +
 				`${this.roster[elements.reserve].length} reserves)`)
-			.setColor(this.raidLead.user.hexAccentColor);
+			.setColor(this.raidLead.hexAccentColor);
 
 		const descriptionArgs = { raidLead: this.formatMember(this.raidLead), time: this.time };
 		const description = sprintf(msgEmbedDescription + `\n${config.spEmoji}`, descriptionArgs);
@@ -218,6 +217,14 @@ class BARun {
 	}
 }
 
+// convert GuildMember to User, with nickname
+// note: this is super cursed
+function convertMemberToUser(member) {
+	const user = member.user;
+	user.nickname = member.nickname;
+	return user;
+}
+
 // create a new run, and add it to futureRuns
 function newRun(raidLead, time) {
 	const run = new BARun(raidLead, time);
@@ -247,7 +254,7 @@ function lookupRunById(runId) {
 function cancelRun(runId, raidLead) {
 	const lookup = lookupRunById(runId);
 	if (lookup.state == 'future') {
-		if (lookup.run.raidLead.user.id == raidLead.user.id) {
+		if (lookup.run.raidLead.id == raidLead.id) {
 			// remove run from futureRuns
 			_.pull(futureRuns, lookup.run);
 
@@ -268,6 +275,8 @@ function bad() {
 }
 
 exports.elements = elements;
+exports.convertMemberToUser = convertMemberToUser;
 exports.newRun = newRun;
 exports.cancelRun = cancelRun;
+
 exports.bad = bad;

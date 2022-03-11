@@ -10,10 +10,10 @@ module.exports = {
 		.addIntegerOption(option => option.setName('timestamp').setDescription('Enter a Unix timestamp.').setRequired(true)),
 	async execute(interaction) {
 		// Confirmation would be great here too.
+
+		// force fetch the user to load accent colour
 		await client.users.fetch(interaction.member.id, { force: true });
-		const raidLead = await interaction.guild.members.fetch(interaction.member.id, { force: true });
-		console.log(raidLead);
-		const createRunOutcome = rm.newRun(raidLead, interaction.options.getInteger('timestamp'));
+		const createRunOutcome = rm.newRun(rm.convertMemberToUser(interaction.member), interaction.options.getInteger('timestamp'));
 		await interaction.reply(createRunOutcome);
 	},
 };

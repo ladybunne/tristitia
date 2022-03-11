@@ -77,7 +77,7 @@ class BARun {
 		if (embellishments) {
 			// add role symbol here
 			if (Object.values(this.leads).find(lead => lead.user.id == member.user.id)) output += '⭐';
-			if (member.user.id == this.raidLead.id) output += '👑';
+			if (member.user.id == this.raidLead.user.id) output += '👑';
 		}
 		return output;
 	}
@@ -115,8 +115,8 @@ class BARun {
 	get embedOverview() {
 		const embed = new MessageEmbed()
 			.setTitle(`Run #${this.runId} - Overview (${this.calculateLeads}/${config.partyCount} leads)`)
-			.setColor(this.raidLead.hexAccentColor)
-			.setThumbnail(this.raidLead.displayAvatarURL());
+			.setColor(this.raidLead.user.hexAccentColor)
+			.setThumbnail(this.raidLead.user.displayAvatarURL());
 
 		const descriptionArgs = { raidLead: this.formatMember(this.raidLead), time: this.time };
 		let description = sprintf(msgEmbedDescription + '\n\n**Party Leads**:\n', descriptionArgs);
@@ -134,7 +134,7 @@ class BARun {
 		const embed = new MessageEmbed()
 			.setTitle(`Run #${this.runId} - Roster (${this.calculateAllMembers}/${config.maxPartySize * config.partyCount} members + ` +
 				`${this.roster[elements.reserve].length} reserves)`)
-			.setColor(this.raidLead.hexAccentColor);
+			.setColor(this.raidLead.user.hexAccentColor);
 
 		const descriptionArgs = { raidLead: this.formatMember(this.raidLead), time: this.time };
 		const description = sprintf(msgEmbedDescription + `\n${config.spEmoji}`, descriptionArgs);
@@ -247,7 +247,7 @@ function lookupRunById(runId) {
 function cancelRun(runId, raidLead) {
 	const lookup = lookupRunById(runId);
 	if (lookup.state == 'future') {
-		if (lookup.run.raidLead.id == raidLead.id) {
+		if (lookup.run.raidLead.user.id == raidLead.user.id) {
 			// remove run from futureRuns
 			_.pull(futureRuns, lookup.run);
 

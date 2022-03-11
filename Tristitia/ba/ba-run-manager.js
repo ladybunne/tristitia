@@ -91,7 +91,7 @@ class BARun {
 		return sprintf(msgCancelText, args);
 	}
 
-	calculatePartyMembers(element) {
+	calculatePartyMemberCount(element) {
 		let lead = 0;
 		if (element != elements.reserve && this.leads[element]) lead = 1;
 		return lead + this.roster[element].length;
@@ -101,13 +101,13 @@ class BARun {
 		return Object.values(this.leads).filter(lead => lead).length;
 	}
 
-	get calculateAllMembers() {
+	get calculateTotalMembersCount() {
 		return Object.values(this.roster).reduce((acc, x) => acc + x.length, 0) + this.calculateLeads;
 	}
 
 	formatPartyTitle(element) {
-		if (element == elements.reserve) return `Reserves (${this.calculatePartyMembers(element)})`;
-		const partyCount = `${this.calculatePartyMembers(element)}/${config.maxPartySize}`;
+		if (element == elements.reserve) return `Reserves (${this.calculatePartyMemberCount(element)})`;
+		const partyCount = `${this.calculatePartyMemberCount(element)}/${config.maxPartySize}`;
 		return `${config.icons[element]} ${_.capitalize(element)} (${partyCount})`;
 	}
 
@@ -131,7 +131,7 @@ class BARun {
 
 	get embedRoster() {
 		const embed = new MessageEmbed()
-			.setTitle(`Run #${this.runId} - Roster (${this.calculateAllMembers}/${config.maxPartySize * config.partyCount} members + ` +
+			.setTitle(`Run #${this.runId} - Roster (${this.calculateTotalMembersCount}/${config.maxPartySize * config.partyCount} members + ` +
 				`${this.roster[elements.reserve].length} reserves)`)
 			.setColor(this.raidLead.hexAccentColor);
 
@@ -140,6 +140,7 @@ class BARun {
 
 		embed.setDescription(description);
 
+		// this needs to be fixed
 		Object.values(elements).forEach(element => {
 			let fieldValue = 'None';
 
@@ -163,7 +164,7 @@ class BARun {
 
 		// buttons
 		const buttons = _.dropRight(Object.values(elements)).map(element => new MessageButton()
-			.setCustomId(`${element}lead`)
+			.setCustomId(`ba-lead-${element}`)
 			.setEmoji(config.hexes[element])
 			.setLabel(`${_.capitalize(element)} Lead`)
 			.setStyle(element == elements.support ? 'PRIMARY' : 'SECONDARY'));
@@ -184,7 +185,7 @@ class BARun {
 			if (element == elements.support) style = 'PRIMARY';
 			else if (element == elements.reserve) style = 'SUCCESS';
 			return new MessageButton()
-				.setCustomId(`${element}`)
+				.setCustomId(`ba-join-${element}`)
 				.setEmoji(config.icons[element])
 				.setLabel(element == elements.reserve ? 'Reserves' : `${_.capitalize(element)} Party`)
 				.setStyle(style);
@@ -278,5 +279,4 @@ exports.elements = elements;
 exports.convertMemberToUser = convertMemberToUser;
 exports.newRun = newRun;
 exports.cancelRun = cancelRun;
-
 exports.bad = bad;

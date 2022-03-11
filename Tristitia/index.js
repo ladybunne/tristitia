@@ -22,20 +22,26 @@ client.once('ready', () => {
 	console.log('Ready!');
 });
 
-// handle interactions
+// handle slash command interactions
 client.on('interactionCreate', async interaction => {
-	if (!interaction.isCommand()) return;
-
-	const command = client.commands.get(interaction.commandName);
-
-	if (!command) return;
-
-	try {
-		await command.execute(interaction);
+	// buttons
+	if (interaction.isButton()) {
+		console.log(interaction);
+		return;
 	}
-	catch (error) {
-		console.error(error);
-		await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+
+	// slash commands
+	if (interaction.isCommand()) {
+		const command = client.commands.get(interaction.commandName);
+		if (!command) return;
+		try {
+			await command.execute(interaction);
+		}
+		catch (error) {
+			console.error(error);
+			await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+		}
+		return;
 	}
 });
 

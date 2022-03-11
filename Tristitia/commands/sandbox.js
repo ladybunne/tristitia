@@ -9,7 +9,9 @@ module.exports = {
 	async execute(interaction) {
 		const futureRuns = rm.bad();
 		const run = futureRuns[0];
-		await interaction.reply({ embeds: [run.embedOverview], components: run.buttonsOverview });
-		await interaction.followUp({ embeds: [run.embedRoster], components: run.buttonsRoster });
+		const overviewReply = await interaction.reply({ embeds: [run.embedOverview], components: run.buttonsOverview, fetchReply: true });
+		run.overviewMessageId = overviewReply.id;
+		const rosterReply = await interaction.followUp({ embeds: [run.embedRoster], components: run.buttonsRoster, fetchReply: true });
+		run.rosterMessageId = rosterReply.id;
 	},
 };

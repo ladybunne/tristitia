@@ -9,18 +9,16 @@ const pastRuns = [];
 const cancelledRuns = [];
 
 const elements = Object.freeze({
-	earth: 'earth',
-	wind: 'wind',
-	water: 'water',
-	fire: 'fire',
-	lightning: 'lightning',
-	ice: 'ice',
-	support: 'support',
-	reserve: 'reserve',
+	earth: 'earth', wind: 'wind', water: 'water',
+	fire: 'fire', lightning: 'lightning', ice: 'ice',
+	support: 'support', reserve: 'reserve',
 });
 
 const msgCreationText = 'Created run #%(id)s, led by %(raidLead)s, scheduled for <t:%(time)s:F>, <t:%(time)s:R>.';
 const msgCancelText = 'Cancelled run #%(id)s, previously scheduled for <t:%(time)s:F>, <t:%(time)s:R>.';
+
+const msgLeadSwapToMember = '**Unable to join %(icon)s%(elementParty)s Party**. You are currently registered as **%(hex)s%(elementLead)s Lead**.\n' +
+    'Please unregister from the lead position, by clicking the button again, if you wish to join a party as a non-lead.';
 
 const msgEmbedDescription = '**Raid Lead**: %(raidLead)s\n' +
 	'**Time**: <t:%(time)s:F>, <t:%(time)s:R>';
@@ -48,7 +46,7 @@ class BARun {
 			earth: null, wind: null, water: null, fire: null, lightning: null, ice: null, support: null, reserve: null,
 		};
 		this.lockLeads = false;
-		this.lockMembers = false;
+		this.lockParties = false;
 		this.lockReserves = false;
 		this.finished = false;
 	}
@@ -62,27 +60,27 @@ class BARun {
 		return password;
 	}
 
-	formatMember(member, embellishments = false, mention = false) {
+	formatUser(user, embellishments = false, mention = false) {
 		let output = 'None';
-		if (!member) return output;
-		if (mention) return `<@${member.id}>`;
+		if (!user) return output;
+		if (mention) return `<@${user.id}>`;
 		try {
-			if (member.nickname) output = member.nickname;
-			else output = member.username;
+			if (user.nickname) output = user.nickname;
+			else output = user.username;
 		}
 		catch (TypeException) {
-			output = member.username;
+			output = user.username;
 		}
 		if (embellishments) {
 			// add role symbol here
-			if (Object.values(this.leads).find(lead => lead.id == member.id)) output += '⭐';
-			if (member.id == this.raidLead.id) output += '👑';
+			if (Object.values(this.leads).find(lead => lead && lead.id == user.id)) output += '⭐';
+			if (user.id == this.raidLead.id) output += '👑';
 		}
 		return output;
 	}
 
 	get creationText() {
-		const args = { id: this.runId, raidLead: this.formatMember(this.raidLead, false, true), time: this.time };
+		const args = { id: this.runId, raidLead: this.formatUser(this.raidLead, false, true), time: this.time };
 		return sprintf(msgCreationText, args);
 	}
 
@@ -117,12 +115,12 @@ class BARun {
 			.setColor(this.raidLead.hexAccentColor)
 			.setThumbnail(this.raidLead.displayAvatarURL());
 
-		const descriptionArgs = { raidLead: this.formatMember(this.raidLead), time: this.time };
+		const descriptionArgs = { raidLead: this.formatUser(this.raidLead), time: this.time };
 		let description = sprintf(msgEmbedDescription + '\n\n**Party Leads**:\n', descriptionArgs);
 
 		// display party leads for all but reserves (no reserve lead!)
 		_.dropRight(Object.values(elements)).forEach(element => {
-			description += `${config.hexes[element]}${this.formatMember(this.leads[element])} `;
+			description += `${config.hexes[element]}${this.formatUser(this.leads[element])} `;
 		});
 
 		embed.setDescription(description);
@@ -135,7 +133,7 @@ class BARun {
 				`${this.roster[elements.reserve].length} reserves)`)
 			.setColor(this.raidLead.hexAccentColor);
 
-		const descriptionArgs = { raidLead: this.formatMember(this.raidLead), time: this.time };
+		const descriptionArgs = { raidLead: this.formatUser(this.raidLead), time: this.time };
 		const description = sprintf(msgEmbedDescription + `\n${config.spEmoji}`, descriptionArgs);
 
 		embed.setDescription(description);
@@ -148,8 +146,8 @@ class BARun {
 			// .length counts as "truthy" and you can just pass it as a condition.
 			// What the hell, JavaScript.
 			if (this.roster[element].length) {
-				const formattedMembers = this.roster[element].map(member => this.formatMember(member, true));
-				fieldValue = formattedMembers.reduce((acc, x) => `\n${x}`);
+				const formattedUsers = this.roster[element].map(user => this.formatUser(user, true));
+				fieldValue = formattedUsers.reduce((acc, x) => `\n${x}`);
 			}
 
 			embed.addField(this.formatPartyTitle(element), fieldValue, true);
@@ -164,7 +162,7 @@ class BARun {
 
 		// buttons
 		const buttons = _.dropRight(Object.values(elements)).map(element => new MessageButton()
-			.setCustomId(`ba-lead-${element}`)
+			.setCustomId(`ba-signup-#${this.runId}-lead-${element}`)
 			.setEmoji(config.hexes[element])
 			.setLabel(`${_.capitalize(element)} Lead`)
 			.setStyle(element == elements.support ? 'PRIMARY' : 'SECONDARY'));
@@ -185,7 +183,7 @@ class BARun {
 			if (element == elements.support) style = 'PRIMARY';
 			else if (element == elements.reserve) style = 'SUCCESS';
 			return new MessageButton()
-				.setCustomId(`ba-join-${element}`)
+				.setCustomId(`ba-signup-#${this.runId}-party-${element}`)
 				.setEmoji(config.icons[element])
 				.setLabel(element == elements.reserve ? 'Reserves' : `${_.capitalize(element)} Party`)
 				.setStyle(style);
@@ -197,7 +195,7 @@ class BARun {
 		// row 2 - fire lightning ice reserves
 		const row2 = new MessageActionRow();
 
-		if (!this.lockMembers) {
+		if (!this.lockParties) {
 			row1.addComponents(buttons.slice(0, 3).concat(buttons[6]));
 			row2.addComponents(buttons.slice(3, 6));
 		}
@@ -207,14 +205,104 @@ class BARun {
 		return [row1, row2].filter(row => row.components.length);
 	}
 
-	// logic pending
-	registerPartyLead(member, element) {
-		this.leads[element] = member;
+	checkExistingLead(user) {
+		Object.values(elements).forEach(element => {
+			if (this.leads[element] && this.leads[element].id == user.id) return element;
+		});
+		return null;
+	}
+
+	checkExistingParty(user) {
+		Object.values(elements).forEach(element => {
+			if (this.roster[element].some(member => member.id == user.id)) return element;
+		});
+		return null;
+	}
+
+	leadAdd(user, element) {
+		if (this.lockLeads) return false;
+		if (!this.leads) this.leads[element] = user;
+		return this.leads[element];
+	}
+
+	leadRemove(user, element) {
+		if (this.lockLeads) return false;
+		if (this.leads[element].id == user.id) this.leads[element] = null;
+		return !this.leads[element];
+	}
+
+	partyAdd(user, element) {
+		if (element == elements.reserve) {
+			if (this.lockReserves) return false;
+		}
+		else if (this.lockParties) return false;
+
+		if (this.roster[element].some(member => member.id == user.id)) return false;
+		if (this.roster[element].length >= config.maxPartySize - 1) return false;
+		this.roster[element].push(user);
+		return this.roster[element].some(member => member.id == user.id);
+	}
+
+	partyRemove(user, element) {
+		if (element == elements.reserve) {
+			if (this.lockReserves) return false;
+		}
+		else if (this.lockParties) return false;
+
+		if (!this.roster[element].some(member => member.id == user.id)) return false;
+		_.pull(this.roster[element], user);
+		return !this.roster[element].some(member => member.id == user.id);
+	}
+
+	// This is a general note, but - it would be really good to track changes to a run's roster.
+	// People often withdraw from runs on the day of the run, sometimes hours prior.
+	// Coding in a "roster log" to track this would be good for a raid lead.
+
+	async signupLead(user, element) {
+		if (this.lockLeads) return false;
+
+		const existingLead = this.checkExistingLead(user);
+		const existingParty = this.checkExistingParty(user);
+		let changed = false;
+
+		if (element == existingLead) changed = this.leadRemove(user, element);
+		else {
+			changed = this.leadAdd(user, element);
+			if (changed) {
+				if (existingLead) this.leadRemove(user, existingLead);
+				if (existingParty) this.partyRemove(user, existingParty);
+			}
+		}
+
+		return changed;
 	}
 
 	// logic pending
-	registerPartyMember(member, element) {
-		this.roster[element].push(member);
+	async signupParty(user, element) {
+		if (element == elements.reserve) {
+			if (this.lockReserves) return false;
+		}
+		else if (this.lockParties) return false;
+
+		const existingLead = this.checkExistingLead(user);
+		const existingParty = this.checkExistingParty(user);
+		let changed = false;
+
+		if (existingLead) {
+			// DM user that they can't swap.
+			const args = { icon: config.icons[element], elementParty: element, hex: config.hexes[existingLead], elementLead: existingLead };
+			await user.send(sprintf(msgLeadSwapToMember, args));
+			return false;
+		}
+		else if (element == existingParty) changed = this.partyRemove(user, element);
+		else {
+			changed = this.partyAdd(user, element);
+			if (changed) {
+				if (existingParty) this.partyRemove(user, existingParty);
+			}
+		}
+
+		return changed;
 	}
 }
 
@@ -271,6 +359,26 @@ function cancelRun(runId, raidLead) {
 	}
 }
 
+async function signupLead(user, runId, element) {
+	const lookup = lookupRunById(runId);
+	if (lookup.run) {
+		const outcome = await lookup.run.signupLead(user, element);
+		console.log(`${user.username} tried to join #${runId} as ${element} lead, outcome: ${outcome}`);
+		return outcome;
+	}
+	return;
+}
+
+async function signupParty(user, runId, element) {
+	const lookup = lookupRunById(runId);
+	if (lookup.run) {
+		const outcome = await lookup.run.signupParty(user, element);
+		console.log(`${user.username} tried to join #${runId}'s ${element} party, outcome: ${outcome}`);
+		return outcome;
+	}
+	return;
+}
+
 function bad() {
 	return futureRuns;
 }
@@ -279,4 +387,6 @@ exports.elements = elements;
 exports.convertMemberToUser = convertMemberToUser;
 exports.newRun = newRun;
 exports.cancelRun = cancelRun;
+exports.signupLead = signupLead;
+exports.signupParty = signupParty;
 exports.bad = bad;

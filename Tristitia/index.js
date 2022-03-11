@@ -3,6 +3,7 @@ require('./sandbox');
 const fs = require('node:fs');
 const { Client, Collection, Intents } = require('discord.js');
 const { token } = require('./config.json');
+const bm = require('./ba/ba-button-mapper');
 
 // new client
 const client = new Client({ intents: [Intents.FLAGS.GUILDS] });
@@ -26,7 +27,7 @@ client.once('ready', () => {
 client.on('interactionCreate', async interaction => {
 	// buttons
 	if (interaction.isButton()) {
-		console.log(interaction);
+		await bm.processButtonInteraction(interaction);
 		return;
 	}
 

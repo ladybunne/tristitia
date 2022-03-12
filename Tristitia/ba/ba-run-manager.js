@@ -17,7 +17,7 @@ const elements = Object.freeze({
 const msgCreationText = 'Created run #%(id)s, led by %(raidLead)s, scheduled for <t:%(time)s:F>, <t:%(time)s:R>.';
 const msgCancelText = 'Cancelled run #%(id)s, previously scheduled for <t:%(time)s:F>, <t:%(time)s:R>.';
 
-const msgLeadSwapToMember = '**Unable to join %(icon)s%(elementParty)s Party**. You are currently registered as **%(hex)s%(elementLead)s Lead**.\n' +
+const msgLeadSwapToMember = '**Unable to join %(icon)s%(elementParty)s**. You are currently registered as **%(hex)s%(elementLead)s Lead**.\n' +
     'Please unregister from the lead position, by clicking the button again, if you wish to join a party as a non-lead.';
 
 const msgEmbedDescription = '**Raid Lead**: %(raidLead)s\n' +
@@ -60,6 +60,14 @@ class BARun {
 		return password;
 	}
 
+	checkExistingLead(user) {
+		return Object.values(elements).find(element => this.leads[element] && this.leads[element].id == user.id);
+	}
+
+	checkExistingParty(user) {
+		return Object.values(elements).find(element => this.roster[element].some(member => member.id == user.id));
+	}
+
 	formatUser(user, embellishments = false, mention = false) {
 		let output = 'None';
 		if (!user) return output;
@@ -71,11 +79,20 @@ class BARun {
 		catch (TypeException) {
 			output = user.username;
 		}
+
+		const isLead = this.checkExistingLead(user);
+		const isRaidLead = user.id == this.raidLead.id;
+
 		if (embellishments) {
 			// add role symbol here
-			if (Object.values(this.leads).find(lead => lead && lead.id == user.id)) output += '⭐';
-			if (user.id == this.raidLead.id) output += '👑';
+			// default to dps now, make this configurable later
+			output = `${config.dpsEmoji} ${output}`;
+
+			if (isLead) output = `**${output}** `;
+			if (isLead) output += config.hexes[isLead];
 		}
+		// add a space if not embellishments, or not lead
+		if (isRaidLead) output += `${!isLead || !embellishments ? ' ' : ''}👑`;
 		return output;
 	}
 
@@ -100,7 +117,7 @@ class BARun {
 	}
 
 	get calculateTotalMembersCount() {
-		return Object.values(this.roster).reduce((acc, x) => acc + x.length, 0) + this.calculateLeads;
+		return _.dropRight(Object.values(this.roster)).reduce((acc, x) => acc + x.length, 0) + this.calculateLeads;
 	}
 
 	formatPartyTitle(element) {
@@ -120,7 +137,7 @@ class BARun {
 
 		// display party leads for all but reserves (no reserve lead!)
 		_.dropRight(Object.values(elements)).forEach(element => {
-			description += `${config.hexes[element]}${this.formatUser(this.leads[element])} `;
+			description += `${config.hexes[element]}${this.formatUser(this.leads[element])}\n`;
 		});
 
 		embed.setDescription(description);
@@ -140,16 +157,18 @@ class BARun {
 
 		// this needs to be fixed
 		Object.values(elements).forEach(element => {
-			let fieldValue = 'None';
+			let fieldValue = '';
 
-			// I maintain this is the absolute dumbest way of checking non-empty.
-			// .length counts as "truthy" and you can just pass it as a condition.
-			// What the hell, JavaScript.
+			if (this.leads[element]) fieldValue += `${this.formatUser(this.leads[element], true)}\n`;
+
+			// party
 			if (this.roster[element].length) {
 				const formattedUsers = this.roster[element].map(user => this.formatUser(user, true));
-				fieldValue = formattedUsers.reduce((acc, x) => `\n${x}`);
+				if (element == elements.reserve) fieldValue += formattedUsers.reduce((acc, x) => acc + `${x}, `, '').slice(0, -2);
+				else fieldValue += formattedUsers.reduce((acc, x) => acc + `${x}\n`, '');
 			}
 
+			if (!fieldValue.length) fieldValue = 'None';
 			embed.addField(this.formatPartyTitle(element), fieldValue, true);
 		});
 
@@ -205,30 +224,16 @@ class BARun {
 		return [row1, row2].filter(row => row.components.length);
 	}
 
-	checkExistingLead(user) {
-		Object.values(elements).forEach(element => {
-			if (this.leads[element] && this.leads[element].id == user.id) return element;
-		});
-		return null;
-	}
-
-	checkExistingParty(user) {
-		Object.values(elements).forEach(element => {
-			if (this.roster[element].some(member => member.id == user.id)) return element;
-		});
-		return null;
-	}
-
 	leadAdd(user, element) {
 		if (this.lockLeads) return false;
-		if (!this.leads) this.leads[element] = user;
-		return this.leads[element];
+		if (!this.leads[element]) this.leads[element] = user;
+		return this.leads[element] != null;
 	}
 
 	leadRemove(user, element) {
 		if (this.lockLeads) return false;
 		if (this.leads[element].id == user.id) this.leads[element] = null;
-		return !this.leads[element];
+		return this.leads[element] == null;
 	}
 
 	partyAdd(user, element) {
@@ -274,6 +279,8 @@ class BARun {
 			}
 		}
 
+		console.log(`signupLead to ${element}, existing: ${existingLead} ${existingParty}`);
+
 		return changed;
 	}
 
@@ -290,7 +297,12 @@ class BARun {
 
 		if (existingLead) {
 			// DM user that they can't swap.
-			const args = { icon: config.icons[element], elementParty: element, hex: config.hexes[existingLead], elementLead: existingLead };
+			const args = {
+				icon: config.icons[element],
+				elementParty: element == elements.reserve ? 'Reserves' : `${_.capitalize(element)} Party`,
+				hex: config.hexes[existingLead],
+				elementLead: _.capitalize(existingLead),
+			};
 			await user.send(sprintf(msgLeadSwapToMember, args));
 			return false;
 		}
@@ -361,22 +373,20 @@ function cancelRun(runId, raidLead) {
 
 async function signupLead(user, runId, element) {
 	const lookup = lookupRunById(runId);
-	if (lookup.run) {
-		const outcome = await lookup.run.signupLead(user, element);
-		console.log(`${user.username} tried to join #${runId} as ${element} lead, outcome: ${outcome}`);
-		return outcome;
+	if (lookup.run) return await lookup.run.signupLead(user, element);
+	else {
+		console.log(`Couldn't sign up for run #${runId}. Reason: ${lookup.state}`);
+		return;
 	}
-	return;
 }
 
 async function signupParty(user, runId, element) {
 	const lookup = lookupRunById(runId);
-	if (lookup.run) {
-		const outcome = await lookup.run.signupParty(user, element);
-		console.log(`${user.username} tried to join #${runId}'s ${element} party, outcome: ${outcome}`);
-		return outcome;
+	if (lookup.run) return await lookup.run.signupParty(user, element);
+	else {
+		console.log(`Couldn't sign up for run #${runId}. Reason: ${lookup.state}`);
+		return;
 	}
-	return;
 }
 
 function bad() {

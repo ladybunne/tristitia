@@ -9,7 +9,7 @@ module.exports = {
 		.addIntegerOption(option => option.setName('id').setDescription('Enter an existing run ID.').setRequired(true)),
 	async execute(interaction) {
 		// Eventually, confirmation would be great here.
-		const cancelRunOutcome = rm.cancelRun(interaction.options.getInteger('id'), interaction.member);
+		const cancelRunOutcome = rm.cancelRun(interaction, interaction.options.getInteger('id'));
 		await interaction.reply(cancelRunOutcome);
 	},
 };

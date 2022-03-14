@@ -1,6 +1,6 @@
 Pre-release
 -----------
-Embeds in proper channel  
+~~Embeds in proper channel~~  
 Regenerate embeds  
 
 Thread creation  

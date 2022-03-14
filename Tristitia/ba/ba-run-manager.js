@@ -145,9 +145,9 @@ class BARun {
 	}
 
 	get embedRoster() {
+		const memberCount = `${this.calculateTotalMembersCount}/${config.maxPartySize * config.partyCount}`;
 		const embed = new MessageEmbed()
-			.setTitle(`Run #${this.runId} - Roster (${this.calculateTotalMembersCount}/${config.maxPartySize * config.partyCount} members + ` +
-				`${this.roster[elements.reserve].length} reserves)`)
+			.setTitle(`Run #${this.runId} - Roster (${memberCount} members + ${this.roster[elements.reserve].length} reserves)`)
 			.setColor(this.raidLead.hexAccentColor);
 
 		const descriptionArgs = { raidLead: this.formatUser(this.raidLead), time: this.time };
@@ -282,7 +282,6 @@ class BARun {
 		return changed;
 	}
 
-	// logic pending
 	async signupParty(user, element) {
 		if (element == elements.reserve) {
 			if (this.lockReserves) return false;
@@ -314,6 +313,17 @@ class BARun {
 
 		return changed;
 	}
+
+	async sendEmbeds(interaction) {
+		// fetch signup channel, using config
+		const signupChannel = await interaction.guild.channels.fetch(config.signupChannelId);
+
+		// send embeds to the right channel!
+		await signupChannel.send({ embeds: [this.embedOverview], components: this.buttonsOverview, fetchReply: true })
+			.then(message => this.overviewMessageId = message.id);
+		await signupChannel.send({ embeds: [this.embedRoster], components: this.buttonsRoster, fetchReply: true })
+			.then(message => this.rosterMessageId = message.id);
+	}
 }
 
 // convert GuildMember to User, with nickname
@@ -332,14 +342,7 @@ async function newRun(interaction, time) {
 	const run = new BARun(raidLead, time);
 	futureRuns.push(run);
 
-	// fetch signup channel, using config
-	const signupChannel = await interaction.guild.channels.fetch(config.signupChannelId);
-
-	// send embeds to the right channel!
-	await signupChannel.send({ embeds: [run.embedOverview], components: run.buttonsOverview, fetchReply: true })
-		.then(message => run.overviewMessageId = message.id);
-	await signupChannel.send({ embeds: [run.embedRoster], components: run.buttonsRoster, fetchReply: true })
-		.then(message => run.rosterMessageId = message.id);
+	await run.sendEmbeds(interaction);
 
 	return run.creationText;
 }
@@ -363,10 +366,10 @@ function lookupRunById(runId) {
 }
 
 // cancel a run, moving it from futureRuns to cancelledRuns
-function cancelRun(runId, raidLead) {
+function cancelRun(interaction, runId) {
 	const lookup = lookupRunById(runId);
 	if (lookup.state == 'future') {
-		if (lookup.run.raidLead.id == raidLead.id) {
+		if (lookup.run.raidLead.id == interaction.member.user.id) {
 			// remove run from futureRuns
 			_.pull(futureRuns, lookup.run);
 

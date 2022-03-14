@@ -1,6 +1,5 @@
 const rm = require('./ba-run-manager');
 
-const patternIsBACommand = /ba/;
 const patternIsBASignup = /signup/;
 const patternIsBALead = /lead/;
 const patternIsBAParty = /party/;
@@ -12,7 +11,6 @@ const patternGetBAElement = /ba-signup-#.*-.*-(.*)/;
 
 async function processButtonInteraction(interaction) {
 	// update original message
-	if (!patternIsBACommand.test(interaction.customId)) await interaction.defer();
 	if (patternIsBASignup.test(interaction.customId)) {
 		const runId = patternGetBARunId.exec(interaction.customId)[1];
 		const element = patternGetBAElement.exec(interaction.customId)[1];

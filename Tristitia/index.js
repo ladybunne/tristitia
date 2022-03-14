@@ -5,6 +5,8 @@ const { Client, Collection, Intents } = require('discord.js');
 const { token } = require('./config.json');
 const bm = require('./ba/ba-button-mapper');
 
+const patternIsBACommand = /ba/;
+
 // new client
 const client = new Client({ intents: [Intents.FLAGS.GUILDS] });
 exports.client = client;
@@ -27,7 +29,7 @@ client.once('ready', () => {
 client.on('interactionCreate', async interaction => {
 	// buttons
 	if (interaction.isButton()) {
-		await bm.processButtonInteraction(interaction);
+		if (patternIsBACommand.test(interaction.customId)) await bm.processButtonInteraction(interaction);
 		return;
 	}
 

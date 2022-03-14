@@ -155,10 +155,10 @@ class BARun {
 
 		embed.setDescription(description);
 
-		// this needs to be fixed
 		Object.values(elements).forEach(element => {
 			let fieldValue = '';
 
+			// lead
 			if (this.leads[element]) fieldValue += `${this.formatUser(this.leads[element], true)}\n`;
 
 			// party
@@ -279,8 +279,6 @@ class BARun {
 			}
 		}
 
-		console.log(`signupLead to ${element}, existing: ${existingLead} ${existingParty}`);
-
 		return changed;
 	}
 
@@ -320,6 +318,7 @@ class BARun {
 
 // convert GuildMember to User, with nickname
 // note: this is super cursed
+// TODO make this work with my own class
 function convertMemberToUser(member) {
 	const user = member.user;
 	user.nickname = member.nickname;
@@ -327,9 +326,21 @@ function convertMemberToUser(member) {
 }
 
 // create a new run, and add it to futureRuns
-function newRun(raidLead, time) {
+async function newRun(interaction, time) {
+	await interaction.client.users.fetch(interaction.member.id, { force: true });
+	const raidLead = convertMemberToUser(interaction.member);
 	const run = new BARun(raidLead, time);
 	futureRuns.push(run);
+
+	// fetch signup channel, using config
+	const signupChannel = await interaction.guild.channels.fetch(config.signupChannelId);
+
+	// send embeds to the right channel!
+	await signupChannel.send({ embeds: [run.embedOverview], components: run.buttonsOverview, fetchReply: true })
+		.then(message => run.overviewMessageId = message.id);
+	await signupChannel.send({ embeds: [run.embedRoster], components: run.buttonsRoster, fetchReply: true })
+		.then(message => run.rosterMessageId = message.id);
+
 	return run.creationText;
 }
 

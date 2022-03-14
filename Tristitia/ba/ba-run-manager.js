@@ -1,3 +1,4 @@
+/* eslint-disable quotes */
 const _ = require('lodash');
 const { sprintf } = require('sprintf-js');
 const { MessageEmbed, MessageActionRow, MessageButton } = require('discord.js');
@@ -17,11 +18,60 @@ const elements = Object.freeze({
 const msgCreationText = 'Created run #%(id)s, led by %(raidLead)s, scheduled for <t:%(time)s:F>, <t:%(time)s:R>.';
 const msgCancelText = 'Cancelled run #%(id)s, previously scheduled for <t:%(time)s:F>, <t:%(time)s:R>.';
 
-const msgLeadSwapToMember = '**Unable to join %(icon)s%(elementParty)s**. You are currently registered as **%(hex)s%(elementLead)s Lead**.\n' +
-    'Please unregister from the lead position, by clicking the button again, if you wish to join a party as a non-lead.';
-
 const msgEmbedDescription = '**Raid Lead**: %(raidLead)s\n' +
 	'**Time**: <t:%(time)s:F>, <t:%(time)s:R>';
+
+const msgLeadSwapToMember = '**Unable to join %(icon)s%(elementParty)s**. ' +
+	'You are currently registered as **%(hex)s%(elementLead)s Lead**.\n' +
+    'Please unregister from the lead position, by clicking the button again, if you wish to join a party as a non-lead.';
+
+
+const msgNotifyLeads = "Hello, %(partyLead)s! You are Run #%(runId)s's **%(hex)s%(element)s Lead**. " +
+	"It's time to put up your party!\n" +
+	"**The password for your party (%(element)s) is __%(password)s__**.\n\n" +
+
+	"Please put up your party ASAP, with the above password, under Adventuring Forays -> Eureka Hydatos.\n" +
+	"Copy this text and use it for the party description:\n" +
+	"```The Fire Place vs BA, Run #%(runId)s - %(element)s Party```\n" +
+
+	"Please ensure you have, in total, **1 tank**, **2 healers** and **5 any** slots listed, minus yourself.\n" +
+	"Leave all other settings untouched.\n\n" +
+
+	"Party members will receive passwords <t:%(time)s:R>, at <t:%(time)s:F>. " +
+	"Please have your party up and configured by then!\n\n" +
+
+	`If you have any questions about this process, please DM Athena (<@${config.botCreatorId}>)! Thank you!`;
+
+const msgNotifyParties = "Hello, members of Run #%(runId)s's **%(icon)s%(element)s Party**! It's time to join your party!\n" +
+	"**The password for your party (%(element)s) is __%(password)s__**.\n\n" +
+
+	"Please look under Private in the Party Finder for your party. It should be listed under Adventuring Forays -> " +
+	"Eureka Hydatos, with **%(icon)s%(element)s** as the listed element and %(partyLead)s as the party lead.\n\n" +
+
+	"Please try and join before <t:%(time)s:F>, <t:%(time)s:R> - reserves will receive all passwords at that time!\n" +
+	"If you are able, please join as a **tank** or **healer** - BA can't happen without them!\n\n" +
+
+	"If you need help, feel free to ask here in this thread. your lead (%(partyLead)s) should see it. " +
+	"If it's urgent, ping them!\n\n" +
+
+	"If you have any questions about this process, please DM Athena! Thank you!";
+
+const msgNotifyReserves = "Hello, reserves of Run #%(runId)s! It's your time to shine!\n" +
+	"Below are the passwords to **ALL parties**. With these, you can fill any remaining spots! Go go!\n\n" +
+
+	"%(passwordList)s\n\n" +
+
+	"If any parties are still up, they'll be under Private in the Party Finder. They should be listed under " +
+	"Adventuring Forays -> Eureka Hydatos, with the element in the description.\n\n" +
+
+	"Act now! There's no guarantee that there _are_ open spots. If there aren't, I'm sorry!\n" +
+	"Please still come into the instance either way - having people on hand is always helpful, and who knows? " +
+	"You might end up on the run after all, if emergency fills are needed!\n\n" +
+
+	"If you have any questions about this process, please DM Athena! Thank you!";
+
+const msgPartiesThreadName = "Run %(runId)s - %(element)s Party";
+const msgReservesThreadName = "Run %(runId)s - Reserves and Public";
 
 class BARun {
 	constructor(raidLead, time) {
@@ -70,18 +120,20 @@ class BARun {
 
 	formatUser(user, embellishments = false, mention = false) {
 		let output = 'None';
+
 		if (!user) return output;
-		if (mention) return `<@${user.id}>`;
-		try {
+
+		const isLead = this.checkExistingLead(user);
+		const isRaidLead = user.id == this.raidLead.id;
+
+		if (mention) output = `<@${user.id}>`;
+		else try {
 			if (user.nickname) output = user.nickname;
 			else output = user.username;
 		}
 		catch (TypeException) {
 			output = user.username;
 		}
-
-		const isLead = this.checkExistingLead(user);
-		const isRaidLead = user.id == this.raidLead.id;
 
 		if (embellishments) {
 			// add role symbol here
@@ -94,16 +146,6 @@ class BARun {
 		// add a space if not embellishments, or not lead
 		if (isRaidLead) output += `${!isLead || !embellishments ? ' ' : ''}👑`;
 		return output;
-	}
-
-	get creationText() {
-		const args = { id: this.runId, raidLead: this.formatUser(this.raidLead, false, true), time: this.time };
-		return sprintf(msgCreationText, args);
-	}
-
-	get cancelText() {
-		const args = { id: this.runId, time: this.time };
-		return sprintf(msgCancelText, args);
 	}
 
 	calculatePartyMemberCount(element) {
@@ -126,6 +168,46 @@ class BARun {
 		return `${config.icons[element]} ${_.capitalize(element)} (${partyCount})`;
 	}
 
+	formatPartyRoster(element, mention = false) {
+		let formattedRoster = '';
+
+		// lead
+		if (this.leads[element]) formattedRoster += `${this.formatUser(this.leads[element], true, mention)}\n`;
+
+		// party
+		if (this.roster[element].length) {
+			const formattedUsers = this.roster[element].map(user => this.formatUser(user, true, mention));
+			if (element == elements.reserve) formattedRoster += formattedUsers.reduce((acc, x) => acc + `${x}, `, '').slice(0, -2);
+			else formattedRoster += formattedUsers.reduce((acc, x) => acc + `${x}\n`, '');
+		}
+
+		if (!formattedRoster.length) formattedRoster = 'None';
+
+		return formattedRoster;
+	}
+
+	get creationText() {
+		const args = { id: this.runId, raidLead: this.formatUser(this.raidLead, false, true), time: this.time };
+		return sprintf(msgCreationText, args);
+	}
+
+	get cancelText() {
+		const args = { id: this.runId, time: this.time };
+		return sprintf(msgCancelText, args);
+	}
+
+	get notifyTimeLeads() {
+		return this.time + config.leadsTimeDelta * 60;
+	}
+
+	get notifyTimeParties() {
+		return this.time + config.partiesTimeDelta * 60;
+	}
+
+	get notifyTimeReserves() {
+		return this.time + config.reservesTimeDelta * 60;
+	}
+
 	get embedOverview() {
 		const embed = new MessageEmbed()
 			.setTitle(`Run #${this.runId} - Overview (${this.calculateLeads}/${config.partyCount} leads)`)
@@ -136,9 +218,9 @@ class BARun {
 		let description = sprintf(msgEmbedDescription + '\n\n**Party Leads**:\n', descriptionArgs);
 
 		// display party leads for all but reserves (no reserve lead!)
-		_.dropRight(Object.values(elements)).forEach(element => {
-			description += `${config.hexes[element]}${this.formatUser(this.leads[element])}\n`;
-		});
+		for (const element of _.dropRight(Object.values(elements))) {
+			description += `${config.hexes[element]} ${this.formatUser(this.leads[element])}\n`;
+		}
 
 		embed.setDescription(description);
 		return embed;
@@ -155,22 +237,9 @@ class BARun {
 
 		embed.setDescription(description);
 
-		Object.values(elements).forEach(element => {
-			let fieldValue = '';
-
-			// lead
-			if (this.leads[element]) fieldValue += `${this.formatUser(this.leads[element], true)}\n`;
-
-			// party
-			if (this.roster[element].length) {
-				const formattedUsers = this.roster[element].map(user => this.formatUser(user, true));
-				if (element == elements.reserve) fieldValue += formattedUsers.reduce((acc, x) => acc + `${x}, `, '').slice(0, -2);
-				else fieldValue += formattedUsers.reduce((acc, x) => acc + `${x}\n`, '');
-			}
-
-			if (!fieldValue.length) fieldValue = 'None';
-			embed.addField(this.formatPartyTitle(element), fieldValue, true);
-		});
+		for (const element of Object.values(elements)) {
+			embed.addField(this.formatPartyTitle(element), this.formatPartyRoster(element, false), true);
+		}
 
 		return embed;
 	}
@@ -226,14 +295,14 @@ class BARun {
 
 	leadAdd(user, element) {
 		if (this.lockLeads) return false;
-		if (!this.leads[element]) this.leads[element] = user;
-		return this.leads[element] != null;
+		if (this.leads[element] == null) this.leads[element] = user;
+		return this.leads[element] != null && this.leads[element].id == user.id;
 	}
 
 	leadRemove(user, element) {
 		if (this.lockLeads) return false;
 		if (this.leads[element].id == user.id) this.leads[element] = null;
-		return this.leads[element] == null;
+		return this.leads[element] == null || this.leads[element].id != user.id;
 	}
 
 	partyAdd(user, element) {
@@ -263,6 +332,8 @@ class BARun {
 	// People often withdraw from runs on the day of the run, sometimes hours prior.
 	// Coding in a "roster log" to track this would be good for a raid lead.
 
+
+	// TODO add feedback for when you try and take someone's position.
 	async signupLead(user, element) {
 		if (this.lockLeads) return false;
 
@@ -282,6 +353,7 @@ class BARun {
 		return changed;
 	}
 
+	// TODO add feedback when you try and join a full party.
 	async signupParty(user, element) {
 		if (element == elements.reserve) {
 			if (this.lockReserves) return false;
@@ -314,15 +386,114 @@ class BARun {
 		return changed;
 	}
 
+	// probably add client as an argument
+	async signupChannel(interaction) {
+		return await interaction.guild.channels.fetch(config.signupChannelId);
+	}
+
 	async sendEmbeds(interaction) {
 		// fetch signup channel, using config
-		const signupChannel = await interaction.guild.channels.fetch(config.signupChannelId);
+		const signupChannel = await this.signupChannel(interaction);
 
 		// send embeds to the right channel!
 		await signupChannel.send({ embeds: [this.embedOverview], components: this.buttonsOverview, fetchReply: true })
 			.then(message => this.overviewMessageId = message.id);
 		await signupChannel.send({ embeds: [this.embedRoster], components: this.buttonsRoster, fetchReply: true })
 			.then(message => this.rosterMessageId = message.id);
+	}
+
+	async notifyLeads() {
+		if (this.lockLeads) return;
+
+		for (const element of Object.values(elements)) {
+			if (this.leads[element] == null) continue;
+
+			const args = {
+				partyLead: this.formatUser(this.leads[element], false, true),
+				runId: this.runId,
+				hex: config.hexes[element],
+				element: _.capitalize(element),
+				password: this.passwords[element],
+				time: this.notifyTimeParties,
+			};
+
+			// TODO Use the private thread to do this instead of DMs, it's a bit more robust.
+			await this.leads[element].send(sprintf(msgNotifyLeads, args))
+				.catch(console.error);
+		}
+
+		this.lockLeads = true;
+	}
+
+	async notifyParties(interaction) {
+		if (this.lockParties) return;
+
+		// check for existing threads
+		if (Object.values(this.threads).find(thread => thread != null)) {
+			console.log(`Threads already exist for Run #${this.runId}.`);
+			this.lockParties = true;
+			return;
+		}
+
+		const signupChannel = await this.signupChannel(interaction);
+
+		for (const element of Object.values(elements)) {
+			// if empty, skip
+			// TODO this is bad if no party lead
+			// Currently it'll go ahead with a group of people that know a password...
+			// ...that's not currently in use for a Party Finder group.
+			if (this.leads[element] == null && !this.roster[element].length) continue;
+
+			// create thread
+			const thread = await signupChannel.threads.create({
+				name: sprintf(msgPartiesThreadName, { runId: this.runId, element: _.capitalize(element) }),
+				autoArchiveDuration: 60,
+				type: 'GUILD_PRIVATE_THREAD',
+			});
+
+			// assemble list of people in the party
+			const formattedRoster = this.formatPartyRoster(element, true) + '\n';
+
+			const args = {
+				runId: this.runId,
+				icon: config.icons[element],
+				element: _.capitalize(element),
+				password: this.passwords[element],
+				partyLead: this.formatUser(this.leads[element], false, true),
+				time: this.notifyTimeReserves,
+			};
+
+			await thread.send(formattedRoster + sprintf(msgNotifyParties, args))
+				.catch(console.error);
+		}
+
+		this.lockParties = true;
+	}
+
+	async notifyReserves(interaction) {
+		if (this.lockReserves) return;
+
+		const signupChannel = await this.signupChannel(interaction);
+
+		const thread = await signupChannel.threads.create({
+			name: sprintf(msgReservesThreadName, { runId: this.runId }),
+			autoArchiveDuration: 60,
+		});
+
+		const formattedRoster = this.formatPartyRoster(elements.reserve, true) + '\n\n';
+
+		const passwordList = _.dropRight(Object.values(elements)).reduce((acc, x) =>
+			acc + `**${config.icons[x]}${_.capitalize(x)} Party**: **__${this.passwords[x]}__**\n`, '').slice(0, -1);
+
+		const args = {
+			runId: this.runId,
+			passwordList: passwordList,
+		};
+
+		await thread.send(formattedRoster + sprintf(msgNotifyReserves, args))
+			.catch(console.error);
+
+		this.lockReserves = true;
 	}
 }
 
@@ -336,6 +507,7 @@ function convertMemberToUser(member) {
 }
 
 // create a new run, and add it to futureRuns
+// accentColor doesn't work if it's the default. Probably a discord.js issue.
 async function newRun(interaction, time) {
 	await interaction.client.users.fetch(interaction.member.id, { force: true });
 	const raidLead = convertMemberToUser(interaction.member);
@@ -366,6 +538,7 @@ function lookupRunById(runId) {
 }
 
 // cancel a run, moving it from futureRuns to cancelledRuns
+// TODO allow overrides (so that select people, like staff, can cancel other people's runs)
 function cancelRun(interaction, runId) {
 	const lookup = lookupRunById(runId);
 	if (lookup.state == 'future') {

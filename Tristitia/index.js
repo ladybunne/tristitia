@@ -22,7 +22,7 @@ for (const file of commandFiles) {
 
 // on ready
 client.once('ready', () => {
-	console.log('Ready!');
+	console.log(`Logged in as ${client.user.username}#${client.user.discriminator}.`);
 });
 
 // handle slash command interactions

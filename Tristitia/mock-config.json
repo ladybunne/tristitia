@@ -10,7 +10,7 @@
     "partyCount": 7,
 
     "leadsTimeDelta": -15,
-    "membersTimeDelta": 0,
+    "partiesTimeDelta": 0,
     "reservesTimeDelta": 10,
     "finishTimeDelta": 180,
 
@@ -43,6 +43,7 @@
     "healerEmoji": "",
     "dpsEmoji": "",
     
-    "spEmoji": ""
+    "spEmoji": "",
 
+    "botCreatorId": ""
 }

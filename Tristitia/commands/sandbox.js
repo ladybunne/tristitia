@@ -7,6 +7,10 @@ module.exports = {
 		.setName('sandbox')
 		.setDescription('A sandbox command that does various things.'),
 	async execute(interaction) {
-		await interaction.reply('Not implemented.');
+		const runs = rm.bad();
+		const run = runs[0];
+		await run.notifyReserves(interaction);
+
+		await interaction.reply('Hooray, a sandbox!');
 	},
 };

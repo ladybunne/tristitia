@@ -1,20 +1,43 @@
-Pre-release
------------
-~~Embeds in proper channel~~  
-Regenerate embeds  
+# Pre-release
 
-Thread creation  
-Scheduled events  
-Party lead DMs  
-Thread/embed cleanup  
+## To Do
 
-Persistence
+- Persistence
 
-Probably make a User class of my own, to support future stuff like roles.  
+## Done
 
+- ~~Make the bot not die when errors happen~~
+- ~~Thread/embed cleanup~~
+- ~~Scheduled events~~
+- ~~Embeds in proper channel~~
+- ~~Party lead DMs~~
+- ~~Thread creation~~
 
-Post-release
-------------
+## Maybe
 
-Commands: /move, /kick, /ban  
-Better config loading  
+- Regenerate embeds (maybe)
+- Combat roles
+
+# Post-release
+
+## Features
+- Descriptions
+- Add support for different styles (rostered / password drop / FFA)
+- Add support for perceptors/callers in overview embed
+
+## Logistics
+- Google Calendar support
+- Start and stop stages
+- Maybe a command to move people automatically to the BA East stage
+
+## Moderation / Admin
+- Commands: /move, /kick, /ban
+
+## Safeguards
+- Prevent raid leads from making multiple runs
+- Prevent runs in the past
+- Confirmation for create and cancel runs
+
+## Misc
+- Better config loading
+- Probably make a User class of my own, to support future stuff like roles.

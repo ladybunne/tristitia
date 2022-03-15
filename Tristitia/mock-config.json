@@ -4,6 +4,7 @@
 	
     "futureRunsFilename": "future_runs.json",
     "pastRunsFilename": "past_runs.json",
+    "cancelledRunsFilename": "cancelled_runs.json",
 
     "startIndex": 1,
     "maxPartySize": 8,

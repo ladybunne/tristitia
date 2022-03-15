@@ -100,3 +100,4 @@ config-*.json
 # This is just local storage.
 future_runs.json
 past_runs.json
+cancelled_runs.json

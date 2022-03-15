@@ -1,15 +1,15 @@
 const rm = require('./ba-run-manager');
 
-const patternIsBASignup = /signup/;
-const patternIsBALead = /lead/;
-const patternIsBAParty = /party/;
+const patternIsBASignup = /^ba-signup-.+/;
+const patternIsBALead = /^ba-signup-#.+-lead-.+/;
+const patternIsBAParty = /^ba-signup-#.+-party-.+/;
 
 // Getting runId via button customId seems... maybe not okay.
 // Revise this later, maybe.
-const patternGetBARunId = /ba-signup-#(.+?)-/;
-const patternGetBAElement = /ba-signup-#.*-.*-(.*)/;
+const patternGetBARunId = /^ba-signup-#([0-9]+?)-.+/;
+const patternGetBAElement = /^ba-signup-#.+-.+-(.+)/;
 
-async function processButtonInteraction(interaction) {
+async function process(interaction) {
 	// update original message
 	if (patternIsBASignup.test(interaction.customId)) {
 		const runId = patternGetBARunId.exec(interaction.customId)[1];
@@ -30,29 +30,11 @@ async function processButtonInteraction(interaction) {
 }
 
 async function signupLead(interaction, runId, element) {
-	await rm.signupLead(rm.convertMemberToUser(interaction.member), runId, element);
-
-	// update embeds
-	const run = rm.bad()[0];
-
-	// this is super duper cursed
-	const overviewMessage = await interaction.channel.messages.fetch(run.overviewMessageId);
-	await overviewMessage.edit({ embeds: [run.embedOverview], components: run.buttonsOverview });
-	const rosterMessage = await interaction.channel.messages.fetch(run.rosterMessageId);
-	await rosterMessage.edit({ embeds: [run.embedRoster], components: run.buttonsRoster });
+	await rm.signupLead(interaction.client, rm.convertMemberToUser(interaction.member), runId, element);
 }
 
 async function signupParty(interaction, runId, element) {
-	await rm.signupParty(rm.convertMemberToUser(interaction.member), runId, element);
-
-	// update embeds
-	const run = rm.bad()[0];
-
-	// this is super duper cursed
-	const overviewMessage = await interaction.channel.messages.fetch(run.overviewMessageId);
-	await overviewMessage.edit({ embeds: [run.embedOverview], components: run.buttonsOverview });
-	const rosterMessage = await interaction.channel.messages.fetch(run.rosterMessageId);
-	await rosterMessage.edit({ embeds: [run.embedRoster], components: run.buttonsRoster });
+	await rm.signupParty(interaction.client, rm.convertMemberToUser(interaction.member), runId, element);
 }
 
-exports.processButtonInteraction = processButtonInteraction;
+exports.process = process;

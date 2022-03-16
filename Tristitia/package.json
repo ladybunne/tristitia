@@ -1,0 +1,23 @@
+{
+  "name": "tristitia",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "start"
+  },
+  "author": "Ladybunne",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@discordjs/builders": "^0.12.0",
+    "@discordjs/rest": "^0.3.0",
+    "discord-api-types": "^0.27.3",
+    "discord.js": "^13.6.0",
+    "lodash": "^4.17.21",
+    "node-schedule": "^2.1.0",
+    "sprintf-js": "^1.1.2"
+  },
+  "devDependencies": {
+    "eslint": "^8.10.0"
+  }
+}

@@ -1,0 +1,52 @@
+{
+    "token": "",
+    "clientId": "",
+	
+    "futureRunsFilename": "future_runs.json",
+    "pastRunsFilename": "past_runs.json",
+    "cancelledRunsFilename": "cancelled_runs.json",
+
+    "startIndex": 1,
+    "maxPartySize": 8,
+    "partyCount": 7,
+
+    "leadsTimeDelta": -15,
+    "partiesTimeDelta": 0,
+    "reservesTimeDelta": 10,
+    "finishTimeDelta": 180,
+
+    "guildId": "",
+    "signupChannelId": "",
+
+    "icons": {
+        "earth": "",
+        "wind": "",
+        "water": "",
+        "fire": "",
+        "lightning": "",
+        "ice": "",
+        "support": "",
+        "reserve": ""
+    },
+    
+    "hexes": {
+        "earth": "",
+        "wind": "",
+        "water": "",
+        "fire": "",
+        "lightning": "",
+        "ice": "",
+        "support": "",
+        "reserve": ""
+    },
+
+    "combatRoles": {
+        "tank": "",
+        "healer": "",
+        "dps": ""
+    },
+    
+    "spEmoji": "",
+
+    "botCreatorId": ""
+}

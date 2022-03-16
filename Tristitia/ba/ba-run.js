@@ -340,11 +340,25 @@ class BARun {
 	async updateEmbeds(client) {
 		const signupChannel = await this.signupChannel(client);
 
-		const overviewMessage = await signupChannel.messages.fetch(this.overviewMessageId);
-		const rosterMessage = await signupChannel.messages.fetch(this.rosterMessageId);
+		// overview
+		try {
+			const overviewMessage = await signupChannel.messages.fetch(this.overviewMessageId);
+			await overviewMessage.edit({ embeds: [this.embedOverview], components: this.buttonsOverview });
+		}
+		catch (err) {
+			console.log(`#${this.runId}: ${this.overviewMessageId}`);
+			console.error(err);
+		}
 
-		await overviewMessage.edit({ embeds: [this.embedOverview], components: this.buttonsOverview });
-		await rosterMessage.edit({ embeds: [this.embedRoster], components: this.buttonsRoster });
+		// roster
+		try {
+			const rosterMessage = await signupChannel.messages.fetch(this.rosterMessageId);
+			await rosterMessage.edit({ embeds: [this.embedRoster], components: this.buttonsRoster });
+		}
+		catch (err) {
+			console.log(`#${this.runId}: ${this.rosterMessageId}`);
+			console.error(err);
+		}
 	}
 
 	// add a party lead

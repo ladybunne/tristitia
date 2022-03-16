@@ -30,6 +30,8 @@ client.once('ready', async () => {
 
 		// update embeds
 		await rm.updateEmbeds(client);
+
+		console.log('Finished startup.');
 	}
 	catch (error) {
 		console.error(error);

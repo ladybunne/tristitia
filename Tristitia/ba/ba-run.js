@@ -10,6 +10,12 @@ const elements = Object.freeze({
 	support: 'support', reserve: 'reserve',
 });
 
+const combatRoles = Object.freeze({
+	tank: 'tank',
+	healer: 'healer',
+	dps: 'dps',
+});
+
 const msgCreationText = 'Created run #%(id)s, led by %(raidLead)s, scheduled for <t:%(time)s:F>, <t:%(time)s:R>.';
 const msgCancelText = 'Cancelled run #%(id)s, previously scheduled for <t:%(time)s:F>, <t:%(time)s:R>.';
 
@@ -22,6 +28,8 @@ const msgLeadSwapToMember = '**Unable to join %(icon)s%(elementParty)s**. ' +
 	'You are currently registered as **%(hex)s%(elementLead)s Lead**.\n' +
     'Please unregister from the lead position, by clicking the button again, if you wish to join a party as a non-lead.';
 
+const msgSetCombatRoleBeforeSignup = '**Unable to change combat role for Run #%(runId)s**.\n' +
+	'You are not currently signed up for Run #%(runId)s. Please sign up for the run, then click a button to change your combat role.';
 
 const msgNotifyLeads = "Hello, %(partyLead)s! You are Run #%(runId)s's **%(hex)s%(element)s Lead**. " +
 	"It's time to put up your party!\n" +
@@ -45,8 +53,7 @@ const msgNotifyParties = "Hello, members of Run #%(runId)s's **%(icon)s%(element
 	"Please look under Private in the Party Finder for your party. It should be listed under Adventuring Forays -> " +
 	"Eureka Hydatos, with **%(icon)s%(element)s** as the listed element and %(partyLead)s as the party lead.\n\n" +
 
-	"Please try and join before <t:%(time)s:F>, <t:%(time)s:R> - reserves will receive all passwords at that time!\n" +
-	"If you are able, please join as a **tank** or **healer** - BA can't happen without them!\n\n" +
+	"Please try and join before <t:%(time)s:F>, <t:%(time)s:R> - reserves will receive all passwords at that time!\n\n" +
 
 	"If you need help, feel free to ask here in this thread. your lead (%(partyLead)s) should see it. " +
 	"If it's urgent, ping them!\n\n" +
@@ -140,7 +147,7 @@ class BARun {
 		if (embellishments) {
 			// add role symbol here
 			// default to dps now, make this configurable later
-			output = `${config.dpsEmoji} ${output}`;
+			output = `${config.combatRoles[user.combatRole]} ${output}`;
 
 			if (isLead) output = `**${output}** `;
 			if (isLead) output += config.hexes[isLead];
@@ -309,7 +316,7 @@ class BARun {
 	// create interaction buttons for roster embed
 	get buttonsRoster() {
 		// buttons
-		const buttons = Object.values(elements).map(element => {
+		const signupButtons = Object.values(elements).map(element => {
 			let style = 'SECONDARY';
 			if (element == elements.support) style = 'PRIMARY';
 			else if (element == elements.reserve) style = 'SUCCESS';
@@ -320,25 +327,42 @@ class BARun {
 				.setStyle(style);
 		});
 
+		function createCombatRoleButton(combatRole, style, runId) {
+			return new MessageButton()
+				.setCustomId(`ba-setcombatrole-#${runId}-${combatRole}`)
+				.setEmoji(config.combatRoles[combatRole])
+				.setLabel(combatRole == combatRoles.dps ? 'DPS' : `${_.capitalize(combatRole)}`)
+				.setStyle(style);
+		}
+
+		const tankButton = createCombatRoleButton(combatRoles.tank, 'PRIMARY', this.runId);
+		const healerButton = createCombatRoleButton(combatRoles.healer, 'SUCCESS', this.runId);
+		const dpsButton = createCombatRoleButton(combatRoles.dps, 'DANGER', this.runId);
+
 		// row 1 - earth wind water support
 		const row1 = new MessageActionRow();
 
 		// row 2 - fire lightning ice reserves
 		const row2 = new MessageActionRow();
 
+		// row 3 - tank healer dps
+		const row3 = new MessageActionRow();
+
 		if (!this.lockParties) {
-			row1.addComponents(buttons.slice(0, 3).concat(buttons[6]));
-			row2.addComponents(buttons.slice(3, 6));
+			row1.addComponents(signupButtons.slice(0, 3).concat(signupButtons[6]));
+			row2.addComponents(signupButtons.slice(3, 6));
 		}
 
-		if (!this.lockReserves) row2.addComponents(buttons[7]);
+		if (!this.lockReserves) row2.addComponents(signupButtons[7]);
 
-		return [row1, row2].filter(row => row.components.length);
+		if (!this.lockParties || !this.lockReserves) row3.addComponents(tankButton, healerButton, dpsButton);
+
+		return [row1, row2, row3].filter(row => row.components.length);
 	}
 
 	// TODO add logic to regenerate embeds
 	async updateEmbeds(client) {
-		const signupChannel = await this.signupChannel(client);
+		const signupChannel = await this.fetchSignupChannel(client);
 
 		// overview
 		try {
@@ -462,9 +486,41 @@ class BARun {
 		return changed;
 	}
 
+	// logic for set combat role request
+	async setCombatRole(client, user, combatRole) {
+		let changed = false;
+		const existingLead = this.checkExistingLead(user);
+		const existingParty = this.checkExistingParty(user);
+
+		// if not signed up...
+		if (!existingLead && !existingParty) {
+			// send a DM explaining you need to sign up before changing your combat role
+			await user.send(sprintf(msgSetCombatRoleBeforeSignup, { runId: this.runId }));
+			return false;
+		}
+
+		// respect locks
+		if (existingLead && this.lockLeads) return false;
+		if (existingParty && existingParty != elements.reserve && this.lockParties) return false;
+		if (existingParty == elements.reserve && this.lockReserves) return false;
+
+		// get original user, not the incoming one
+		let originalUser;
+		if (existingLead) originalUser = this.leads[existingLead];
+		else if (existingParty) originalUser = this.roster[existingParty].find(partyMember => partyMember.id == user.id);
+
+		if (originalUser.combatRole != combatRole) {
+			originalUser.combatRole = combatRole;
+			changed = true;
+		}
+
+		if (changed) await this.updateEmbeds(client);
+		return changed;
+	}
+
 	// get signup channel
 	// TODO think about how this will flow upon restarts - is there even an interaction? (no)
-	async signupChannel(client) {
+	async fetchSignupChannel(client) {
 		const guild = await client.guilds.fetch(config.guildId);
 		return await guild.channels.fetch(config.signupChannelId);
 	}
@@ -472,7 +528,7 @@ class BARun {
 	// send embeds to signup channel
 	async sendEmbeds(client) {
 		// fetch signup channel, using config
-		const signupChannel = await this.signupChannel(client);
+		const signupChannel = await this.fetchSignupChannel(client);
 
 		// send embeds to the right channel!
 		await signupChannel.send({ embeds: [this.embedOverview], components: this.buttonsOverview, fetchReply: true })
@@ -502,8 +558,8 @@ class BARun {
 				.catch(console.error);
 		}
 
-		await this.updateEmbeds(client);
 		this.lockLeads = true;
+		await this.updateEmbeds(client);
 	}
 
 	// notify parties - typically called automatically
@@ -517,7 +573,7 @@ class BARun {
 			return;
 		}
 
-		const signupChannel = await this.signupChannel(client);
+		const signupChannel = await this.fetchSignupChannel(client);
 
 		for (const element of Object.values(elements)) {
 			// if empty, skip
@@ -551,15 +607,15 @@ class BARun {
 				.catch(console.error);
 		}
 
-		await this.updateEmbeds(client);
 		this.lockParties = true;
+		await this.updateEmbeds(client);
 	}
 
 	// notify reserves - typically called automatically
 	async notifyReserves(client) {
 		if (this.lockReserves) return;
 
-		const signupChannel = await this.signupChannel(client);
+		const signupChannel = await this.fetchSignupChannel(client);
 
 		const reserveThreadMessage = await signupChannel.send(
 			sprintf(msgReservesThreadMessage, { runId: this.runId }));
@@ -585,13 +641,13 @@ class BARun {
 		await thread.send(formattedRoster + sprintf(msgNotifyReserves, args))
 			.catch(console.error);
 
-		await this.updateEmbeds(client);
 		this.lockReserves = true;
+		await this.updateEmbeds(client);
 	}
 
 	// finish run - typically called automatically
 	async finish(client) {
-		const signupChannel = await this.signupChannel(client);
+		const signupChannel = await this.fetchSignupChannel(client);
 
 		// archive all threads
 		for (const threadId of Object.values(this.threads)) {
@@ -633,7 +689,7 @@ class BARun {
 		let cancelled = false;
 		if (this.lockLeads || this.lockParties || this.lockReserves) return cancelled;
 
-		const signupChannel = await this.signupChannel(client);
+		const signupChannel = await this.fetchSignupChannel(client);
 
 		// delete all embeds
 		const overviewMessage = await signupChannel.messages.fetch(this.overviewMessageId);
@@ -652,6 +708,7 @@ class BARun {
 function convertMemberToUser(member) {
 	const user = member.user;
 	user.nickname = member.nickname;
+	user.combatRole = combatRoles.dps;
 	return user;
 }
 

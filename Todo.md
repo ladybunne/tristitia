@@ -2,10 +2,12 @@
 
 ## To Do
 
-- Persistence
+Done!
 
 ## Done
 
+- ~~Combat roles~~
+- ~~Persistence~~
 - ~~Make the bot not die when errors happen~~
 - ~~Thread/embed cleanup~~
 - ~~Scheduled events~~
@@ -16,7 +18,6 @@
 ## Maybe
 
 - Regenerate embeds (maybe)
-- Combat roles
 
 # Post-release
 

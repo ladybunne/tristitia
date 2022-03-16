@@ -1,5 +1,6 @@
 const _ = require('lodash');
 const fs = require('fs/promises');
+const schedule = require('node-schedule');
 const { BARun, elements, convertMemberToUser } = require('./ba-run');
 const config = require('../config.json');
 
@@ -16,7 +17,7 @@ async function saveRuns() {
 	await fs.writeFile(config.futureRunsFilename, JSON.stringify(futureRuns), handleError);
 	await fs.writeFile(config.pastRunsFilename, JSON.stringify(pastRuns), handleError);
 	await fs.writeFile(config.cancelledRunsFilename, JSON.stringify(cancelledRuns), handleError);
-	console.log('Saved runs.');
+	// console.log('Saved runs.');
 }
 
 async function loadRuns(client) {
@@ -34,27 +35,37 @@ async function loadRuns(client) {
 		.then((data) => cancelledRuns = JSON.parse(data).map(run => Object.assign(new BARun, run)))
 		.catch(handleError);
 
-	console.log(`${futureRuns.map(run => run.runId)}\n` +
-		`${pastRuns.map(run => run.runId)}\n` +
-		`${cancelledRuns.map(run => run.runId)}`);
+	// console.log(`future: ${futureRuns.map(run => run.runId)}\n` +
+	// 	`past: ${pastRuns.map(run => run.runId)}\n` +
+	// 	`cancelled: ${cancelledRuns.map(run => run.runId)}`);
 
 	for (const run of futureRuns) await run.refreshLead(client);
 
-	console.log('Loaded runs.');
+	// console.log('Loaded runs.');
 }
 
 // schedule notify events
 function scheduleNotifyEvents(client, run) {
-	const notifyLeads = () => run.notifyLeads(client);
-	const notifyParties = () => run.notifyParties(client);
-	const notifyReserves = () => run.notifyReserves(client);
-	const finish = () => finishRun(client, run.runId);
+	const notifyLeads = async () => await run.notifyLeads(client);
+	const notifyParties = async () => await run.notifyParties(client);
+	const notifyReserves = async () => await run.notifyReserves(client);
+	const finish = async () => await finishRun(client, run.runId);
 
-	const now = Date.now();
-	setTimeout(notifyLeads, run.timeNotifyLeads * 1000 - now);
-	setTimeout(notifyParties, run.timeNotifyParties * 1000 - now);
-	setTimeout(notifyReserves, run.timeNotifyReserves * 1000 - now);
-	setTimeout(finish, run.timeFinish * 1000 - now);
+	const timeNotifyLeads = new Date(run.timeNotifyLeads * 1000);
+	const timeNotifyParties = new Date(run.timeNotifyParties * 1000);
+	const timeNotifyReserves = new Date(run.timeNotifyReserves * 1000);
+	const timeFinish = new Date(run.timeFinish * 1000);
+
+	schedule.scheduleJob(timeNotifyLeads, notifyLeads);
+	schedule.scheduleJob(timeNotifyParties, notifyParties);
+	schedule.scheduleJob(timeNotifyReserves, notifyReserves);
+	schedule.scheduleJob(timeFinish, finish);
+
+	// const now = Date.now();
+	// setTimeout(notifyLeads, run.timeNotifyLeads * 1000 - now);
+	// setTimeout(notifyParties, run.timeNotifyParties * 1000 - now);
+	// setTimeout(notifyReserves, run.timeNotifyReserves * 1000 - now);
+	// setTimeout(finish, run.timeFinish * 1000 - now);
 }
 
 // create a new run, and add it to futureRuns
@@ -165,7 +176,7 @@ async function signupLead(client, user, runId, element) {
 		return;
 	}
 	const outcome = await lookup.run.signupLead(client, user, element);
-	await saveRuns();
+	if (outcome) await saveRuns();
 	return outcome;
 }
 
@@ -177,13 +188,20 @@ async function signupParty(client, user, runId, element) {
 		return;
 	}
 	const outcome = await lookup.run.signupParty(client, user, element);
-	await saveRuns();
+	if (outcome) await saveRuns();
 	return outcome;
 }
 
-// this really shouldn't exist
-function bad() {
-	return futureRuns;
+// external combat role change request
+async function setCombatRole(client, user, runId, combatRole) {
+	const lookup = lookupRunById(runId);
+	if (!lookup.run) {
+		console.log(`Couldn't change combat role for Run #${runId}. Reason: ${lookup.state}`);
+		return;
+	}
+	const outcome = await lookup.run.setCombatRole(client, user, combatRole);
+	if (outcome) await saveRuns();
+	return outcome;
 }
 
 exports.elements = elements;
@@ -195,4 +213,4 @@ exports.cancelRun = cancelRun;
 exports.updateEmbeds = updateEmbeds;
 exports.signupLead = signupLead;
 exports.signupParty = signupParty;
-exports.bad = bad;
+exports.setCombatRole = setCombatRole;

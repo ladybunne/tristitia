@@ -40,9 +40,11 @@
         "reserve": ""
     },
 
-    "tankEmoji": "",
-    "healerEmoji": "",
-    "dpsEmoji": "",
+    "combatRoles": {
+        "tank": "",
+        "healer": "",
+        "dps": ""
+    },
     
     "spEmoji": "",
 

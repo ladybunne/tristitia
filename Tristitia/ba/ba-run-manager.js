@@ -1,5 +1,5 @@
 const _ = require('lodash');
-const fs = require('fs');
+const fs = require('fs/promises');
 const { BARun, elements, convertMemberToUser } = require('./ba-run');
 const config = require('../config.json');
 
@@ -13,45 +13,30 @@ function handleError(err) {
 }
 
 async function saveRuns() {
-	fs.writeFileSync(config.futureRunsFilename, JSON.stringify(futureRuns), handleError);
-	fs.writeFileSync(config.pastRunsFilename, JSON.stringify(pastRuns), handleError);
-	fs.writeFileSync(config.cancelledRunsFilename, JSON.stringify(cancelledRuns), handleError);
+	await fs.writeFile(config.futureRunsFilename, JSON.stringify(futureRuns), handleError);
+	await fs.writeFile(config.pastRunsFilename, JSON.stringify(pastRuns), handleError);
+	await fs.writeFile(config.cancelledRunsFilename, JSON.stringify(cancelledRuns), handleError);
 	console.log('Saved runs.');
 }
 
 async function loadRuns(client) {
 	// lots of duplication here, but it's somewhat unavoidable
 
-	// future
-	try {
-		const futureData = fs.readFileSync(config.futureRunsFilename);
-		futureRuns = JSON.parse(futureData).map(run => Object.assign(BARun.prototype, run));
-	}
-	catch (err) {
-		console.error(err);
-	}
+	await fs.readFile(config.futureRunsFilename)
+		.then((data) => futureRuns = JSON.parse(data).map(run => Object.assign(new BARun, run)))
+		.catch(handleError);
 
-	// past
-	try {
-		const pastData = fs.readFileSync(config.pastRunsFilename);
-		pastRuns = JSON.parse(pastData).map(run => Object.assign(BARun.prototype, run));
-	}
-	catch (err) {
-		console.error(err);
-	}
+	await fs.readFile(config.pastRunsFilename)
+		.then((data) => pastRuns = JSON.parse(data).map(run => Object.assign(new BARun, run)))
+		.catch(handleError);
 
-	// cancelled
-	try {
-		const cancelledData = fs.readFileSync(config.cancelledRunsFilename);
-		cancelledRuns = JSON.parse(cancelledData).map(run => Object.assign(BARun.prototype, run));
-	}
-	catch (err) {
-		console.error(err);
-	}
+	await fs.readFile(config.cancelledRunsFilename)
+		.then((data) => cancelledRuns = JSON.parse(data).map(run => Object.assign(new BARun, run)))
+		.catch(handleError);
 
-	console.log(`future: ${futureRuns.map(run => run.runId)}\n` +
-		`past: ${pastRuns.map(run => run.runId)}\n` +
-		`cancelled: ${cancelledRuns.map(run => run.runId)}\n`);
+	console.log(`${futureRuns.map(run => run.runId)}\n` +
+		`${pastRuns.map(run => run.runId)}\n` +
+		`${cancelledRuns.map(run => run.runId)}`);
 
 	for (const run of futureRuns) await run.refreshLead(client);
 

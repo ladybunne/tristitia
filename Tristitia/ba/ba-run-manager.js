@@ -2,16 +2,13 @@ const _ = require('lodash');
 const fs = require('fs/promises');
 const schedule = require('node-schedule');
 const { BARun, elements, convertMemberToUser } = require('./ba-run');
+const { handleError } = require('../common');
 const config = require('../config.json');
 
 // now with new and improved persistence!
 let futureRuns = [];
 let pastRuns = [];
 let cancelledRuns = [];
-
-function handleError(err) {
-	if (err) console.log(err);
-}
 
 async function saveRuns() {
 	await fs.writeFile(config.futureRunsFilename, JSON.stringify(futureRuns), handleError);
@@ -87,6 +84,7 @@ async function newRun(interaction, time) {
 	const run = new BARun(runId, raidLead, time);
 	futureRuns.push(run);
 
+	await run.createAuditLogThread(interaction.client);
 	await run.sendEmbeds(interaction.client);
 
 	scheduleNotifyEvents(interaction.client, run);
@@ -169,37 +167,37 @@ async function updateEmbeds(client) {
 }
 
 // external lead signup request
-async function signupLead(client, user, runId, element) {
+async function signupLead(interaction, user, runId, element) {
 	const lookup = lookupRunById(runId);
 	if (!lookup.run) {
 		console.log(`Couldn't sign up as lead for Run #${runId}. Reason: ${lookup.state}`);
 		return;
 	}
-	const outcome = await lookup.run.signupLead(client, user, element);
+	const outcome = await lookup.run.signupLead(interaction, user, element);
 	if (outcome) await saveRuns();
 	return outcome;
 }
 
 // external party signup request
-async function signupParty(client, user, runId, element) {
+async function signupParty(interaction, user, runId, element) {
 	const lookup = lookupRunById(runId);
 	if (!lookup.run) {
 		console.log(`Couldn't sign up as party for Run #${runId}. Reason: ${lookup.state}`);
 		return;
 	}
-	const outcome = await lookup.run.signupParty(client, user, element);
+	const outcome = await lookup.run.signupParty(interaction, user, element);
 	if (outcome) await saveRuns();
 	return outcome;
 }
 
 // external combat role change request
-async function setCombatRole(client, user, runId, combatRole) {
+async function setCombatRole(interaction, user, runId, combatRole) {
 	const lookup = lookupRunById(runId);
 	if (!lookup.run) {
 		console.log(`Couldn't change combat role for Run #${runId}. Reason: ${lookup.state}`);
 		return;
 	}
-	const outcome = await lookup.run.setCombatRole(client, user, combatRole);
+	const outcome = await lookup.run.setCombatRole(interaction, user, combatRole);
 	if (outcome) await saveRuns();
 	return outcome;
 }

@@ -5,6 +5,7 @@ const { Client, Collection, Intents } = require('discord.js');
 const { token } = require('./config.json');
 const rm = require('./ba/ba-run-manager');
 const bm = require('./ba/ba-button-mapper');
+const { handleError } = require('./common');
 
 const patternIsBACommand = /ba/;
 
@@ -34,7 +35,7 @@ client.once('ready', async () => {
 		console.log('Finished startup.');
 	}
 	catch (error) {
-		console.error(error);
+		handleError(error);
 	}
 });
 
@@ -54,12 +55,12 @@ client.on('interactionCreate', async interaction => {
 		}
 	}
 	catch (error) {
-		console.error(error);
+		handleError(error);
 		try {
 			await interaction.reply({ content: 'There was an error while handling this interaction!', ephemeral: true });
 		}
 		catch (replyError) {
-			console.error(replyError);
+			handleError(replyError);
 		}
 	}
 	return;

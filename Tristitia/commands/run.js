@@ -8,7 +8,8 @@ module.exports = {
 		.addIntegerOption(option => option.setName('timestamp').setDescription('Enter a Unix timestamp.').setRequired(true)),
 	async execute(interaction) {
 		// Confirmation would be great here too.
+		await interaction.deferReply();
 		const newRunOutcome = await rm.newRun(interaction, interaction.options.getInteger('timestamp'));
-		await interaction.reply(newRunOutcome);
+		await interaction.editReply(newRunOutcome);
 	},
 };

@@ -88,15 +88,14 @@ const msgAuditLogThreadCreate = 'Hi, %(raidLead)s of Run #%(runId)s!\n\n' +
 
 const msgAuditHeader = '[<t:%(time)s:d> <t:%(time)s:T>, <t:%(time)s:R>]';
 const msgAuditJoinLead = '%(user)s signed up as %(newLead)s.';
-const msgAuditMoveLead = '%(user)s changed lead element: %(oldLead)s -> %(newLead)s';
-const msgAuditPromoteLead = '%(user)s promoted to lead: %(oldParty)s -> %(newLead)s';
+const msgAuditMoveLead = '%(user)s changed lead element: %(oldLead)s → %(newLead)s';
+const msgAuditPromoteLead = '%(user)s promoted to lead: %(oldParty)s → %(newLead)s';
 const msgAuditLeaveLead = '%(user)s withdrew from %(oldLead)s.';
 const msgAuditJoinParty = '%(user)s joined %(newParty)s.';
 const msgAuditMoveParty = '%(user)s moved party: %(oldParty)s -> %(newParty)s';
 const msgAuditLeaveParty = '%(user)s left %(oldParty)s.';
 const msgAuditChangeRole = '%(user)s changed role: ' +
-	'%(oldRoleIcon)s **%(oldRole)s** -> %(newRoleIcon)s **%(newRole)s**';
-
+	'%(oldRoleIcon)s **%(oldRole)s** → %(newRoleIcon)s **%(newRole)s**';
 
 class BARun {
 	constructor(runId, raidLead, time) {
@@ -304,7 +303,7 @@ class BARun {
 
 		if (!user) return output;
 
-		const isLead = this.checkExistingLead(user);
+		const isLead = this.checkExisting(user).lead;
 		const isRaidLead = user.id == this.raidLead.id;
 
 		if (mention) output = `<@${user.id}>`;
@@ -317,12 +316,9 @@ class BARun {
 		}
 
 		if (embellishments) {
-			// add role symbol here
-			// default to dps now, make this configurable later
 			output = `${config.combatRoles[user.combatRole]} ${output}`;
 
-			if (isLead) output = `**${output}** `;
-			if (isLead) output += config.hexes[isLead];
+			if (isLead) output = `**${output}** ${config.hexes[isLead]}`;
 		}
 		// add a space if not embellishments, or not lead
 		if (isRaidLead) output += `${!isLead || !embellishments ? ' ' : ''}👑`;
@@ -400,6 +396,7 @@ class BARun {
 		const thread = await signupChannel.threads.create({
 			name: sprintf(msgAuditLogThreadName, { runId: this.runId }),
 			autoArchiveDuration: 'MAX',
+			invitable: false,
 			type: 'GUILD_PRIVATE_THREAD',
 		});
 
@@ -432,14 +429,28 @@ class BARun {
 		return await guild.channels.fetch(config.signupChannelId);
 	}
 
-	// check if a user is signed up as a lead
-	checkExistingLead(user) {
-		return Object.values(elements).find(element => this.leads[element] && this.leads[element].id == user.id);
+	// check if someone is already signed up, and return details if they are
+	checkExisting(user) {
+		const lead = Object.values(elements).find(element => this.leads[element] && this.leads[element].id == user.id);
+		const party = Object.values(elements).find(element => this.roster[element].some(member => member.id == user.id));
+
+		return { lead: lead, party: party };
 	}
 
-	// check if a user is signed up as a party member
-	checkExistingParty(user) {
-		return Object.values(elements).find(element => this.roster[element].some(member => member.id == user.id));
+	// get existing combat role if present
+	getExistingCombatRole(user) {
+		let role;
+		for (const party of Object.values(this.roster)) {
+			const foundUser = party.find(member => member.id == user.id);
+			if (foundUser != undefined) {
+				console.log(foundUser.id);
+				role = foundUser.combatRole;
+				break;
+			}
+		}
+
+		console.log(`incoming: ${user.combatRole} vs existing: ${role}`);
+		return role;
 	}
 
 	// add a party lead
@@ -544,8 +555,8 @@ class BARun {
 		const header = sprintf(msgAuditHeader, { time: now });
 		const embed = new MessageEmbed()
 			.setTitle(header)
-			.setDescription(message);
-		// await thread.send(`${header}\n${message}`);
+			.setDescription(message)
+			.setTimestamp();
 		await thread.send({ embeds: [embed] });
 	}
 
@@ -560,16 +571,14 @@ class BARun {
 	}
 
 	// logic for lead signup request
-	// TODO add feedback for when you try and take someone's position.
 	async signupLead(interaction, user, element) {
 		if (this.lockLeads) return false;
 
-		const existingLead = this.checkExistingLead(user);
-		const existingParty = this.checkExistingParty(user);
+		const existing = this.checkExisting(user);
 		let changed = false;
 		let auditMessage;
 
-		if (element == existingLead) {
+		if (element == existing.lead) {
 			changed = this.leadRemove(user, element);
 			auditMessage = msgAuditLeaveLead;
 		}
@@ -581,12 +590,12 @@ class BARun {
 		else {
 			changed = this.leadAdd(user, element);
 			if (changed) {
-				if (existingLead) {
-					this.leadRemove(user, existingLead);
+				if (existing.lead) {
+					this.leadRemove(user, existing.lead);
 					auditMessage = msgAuditMoveLead;
 				}
-				else if (existingParty) {
-					this.partyRemove(user, existingParty);
+				else if (existing.party) {
+					this.partyRemove(user, existing.party);
 					auditMessage = msgAuditPromoteLead;
 				}
 				else {
@@ -600,7 +609,7 @@ class BARun {
 			await this.updateEmbeds(interaction.client, false, true);
 			const args = {
 				user: this.formatUser(user, false, false),
-				oldLead: this.formatPartyLeadSimple(existingLead),
+				oldLead: this.formatPartyLeadSimple(existing.lead),
 				newLead: this.formatPartyLeadSimple(element),
 				oldParty: this.formatPartyNameSimple(element),
 			};
@@ -617,33 +626,33 @@ class BARun {
 		}
 		else if (this.lockParties) return false;
 
-		const existingLead = this.checkExistingLead(user);
-		const existingParty = this.checkExistingParty(user);
+		const existing = this.checkExisting(user);
 		let changed = false;
 		let auditMessage;
 
-		if (existingLead) {
+		if (existing.lead) {
 			// not allowed to step down from lead without explicitly doing so
 			const args = {
 				elementParty: this.formatPartyNameSimple(element, false),
-				elementLead: this.formatPartyLeadSimple(element),
+				elementLead: this.formatPartyLeadSimple(existing.lead),
 			};
 			await interaction.reply({ content: sprintf(msgLeadSwapToMember, args), ephemeral: true });
 			return false;
 		}
-		else if (element == existingParty) {
+		else if (element == existing.party) {
 			changed = this.partyRemove(user, element);
 			auditMessage = msgAuditLeaveParty;
 		}
 		else if (this.roster[element].length >= config.maxPartySize - 1) {
 			await interaction.reply({ content: 'Unable to join, party is full. (Replace this message later.)',
 				ephemeral: true });
+			return;
 		}
 		else {
 			changed = this.partyAdd(user, element);
 			if (changed) {
-				if (existingParty) {
-					this.partyRemove(user, existingParty);
+				if (existing.party) {
+					this.partyRemove(user, existing.party);
 					auditMessage = msgAuditMoveParty;
 				}
 				else {
@@ -656,7 +665,7 @@ class BARun {
 			await interaction.update({ embeds: [this.embedRoster], components: this.buttonsRoster });
 			const args = {
 				user: this.formatUser(user, false, false),
-				oldParty: this.formatPartyNameSimple(existingParty),
+				oldParty: this.formatPartyNameSimple(existing.party),
 				newParty: this.formatPartyNameSimple(element),
 			};
 			await this.log(interaction.client, sprintf(auditMessage, args));
@@ -666,12 +675,11 @@ class BARun {
 
 	// logic for set combat role request
 	async setCombatRole(interaction, user, combatRole) {
+		const existing = this.checkExisting(user);
 		let changed = false;
-		const existingLead = this.checkExistingLead(user);
-		const existingParty = this.checkExistingParty(user);
 
 		// if not signed up...
-		if (!existingLead && !existingParty) {
+		if (!existing.lead && !existing.party) {
 			// send a DM explaining you need to sign up before changing your combat role
 			await interaction.reply({ content: sprintf(msgSetCombatRoleBeforeSignup, { runId: this.runId }),
 				ephemeral: true });
@@ -679,18 +687,21 @@ class BARun {
 		}
 
 		// respect locks
-		if (existingLead && this.lockLeads) return false;
-		if (existingParty && existingParty != elements.reserve && this.lockParties) return false;
-		if (existingParty == elements.reserve && this.lockReserves) return false;
+		if (existing.lead && this.lockLeads) return false;
+		if (existing.party && existing.party != elements.reserve && this.lockParties) return false;
+		if (existing.party == elements.reserve && this.lockReserves) return false;
 
-		// get original user, not the incoming one
 		let originalUser;
-		if (existingLead) originalUser = this.leads[existingLead];
-		else if (existingParty) originalUser = this.roster[existingParty].find(partyMember => partyMember.id == user.id);
+		if (existing.lead) originalUser = this.leads[existing.lead];
+		else if (existing.party) originalUser = this.roster[existing.party].find(partyMember => partyMember.id == user.id);
 
 		const oldCombatRole = originalUser.combatRole;
 
-		if (originalUser.combatRole != combatRole) {
+		if (oldCombatRole == combatRole) {
+			await interaction.reply({ content: 'Same role. (Replace this message later.)', ephemeral: true });
+			return false;
+		}
+		else {
 			originalUser.combatRole = combatRole;
 			changed = true;
 		}
@@ -698,7 +709,7 @@ class BARun {
 		if (changed) {
 			await interaction.update({ embeds: [this.embedRoster], components: this.buttonsRoster });
 			const args = {
-				user: this.formatUser(originalUser),
+				user: this.formatUser(user),
 				oldRoleIcon: config.combatRoles[oldCombatRole],
 				oldRole: oldCombatRole,
 				newRoleIcon: config.combatRoles[combatRole],

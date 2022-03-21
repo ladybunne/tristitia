@@ -3,10 +3,11 @@
 ## To Do
 
 - Fix combat role bug
-- Fix bug with showing wrong name on lead step-down
+- Fix persistence bug
 
 ## Done
 
+- ~~Fix bug with showing wrong name on lead step-down~~
 - ~~Audit log for runs~~
 
 ---

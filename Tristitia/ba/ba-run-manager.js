@@ -43,10 +43,23 @@ async function loadRuns(client) {
 
 // schedule notify events
 function scheduleNotifyEvents(client, run) {
-	const notifyLeads = async () => await run.notifyLeads(client);
-	const notifyParties = async () => await run.notifyParties(client);
-	const notifyReserves = async () => await run.notifyReserves(client);
-	const finish = async () => await finishRun(client, run.runId);
+	// error handling so the bot doesn't explode
+	const notifyLeads = async () => {
+		try { await run.notifyLeads(client); }
+		catch (err) { handleError(err); }
+	};
+	const notifyParties = async () => {
+		try { await run.notifyParties(client); }
+		catch (err) { handleError(err); }
+	};
+	const notifyReserves = async () => {
+		try { await run.notifyReserves(client); }
+		catch (err) { handleError(err); }
+	};
+	const finish = async () => {
+		try { await finishRun(client, run.runId); }
+		catch (err) { handleError(err); }
+	};
 
 	const timeNotifyLeads = new Date(run.timeNotifyLeads * 1000);
 	const timeNotifyParties = new Date(run.timeNotifyParties * 1000);

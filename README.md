@@ -33,7 +33,7 @@ Thanks to the following **beta testers**, for hopping in Discord and testing my 
 - Licia
 - Maya
 
-Thanks to the **BA participants** of The Fire Place for live-testing Tristitia, during Runs #2, #3 and #4. (I'm sorry about the triple lead DMs on #4.)
+Thanks to the **BA participants** of The Fire Place for beta-testing Tristitia during Runs #2, #3 and #4. (I'm sorry about the triple lead DMs on #4.)
 
 Thank you especially to the **supporting staff** of the above runs:
 

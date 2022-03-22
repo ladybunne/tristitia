@@ -12,6 +12,14 @@ const elements = Object.freeze({
 	support: 'support', reserve: 'reserve',
 });
 
+const auditColors = Object.freeze({
+	green: '#44e544',
+	yellow: '#e5e544',
+	red: '#e54444',
+	purple: '#e544e5',
+	grey: '#b2b2b2',
+});
+
 class BARun {
 	constructor(runId, raidLead, time) {
 		this.runId = runId;
@@ -222,13 +230,7 @@ class BARun {
 		const isRaidLead = user.id == this.raidLead.id;
 
 		if (mention) output = `<@${user.id}>`;
-		else try {
-			if (user.nickname) output = user.nickname;
-			else output = user.username;
-		}
-		catch (TypeException) {
-			output = user.username;
-		}
+		else output = user.nickname != undefined ? user.nickname : user.username;
 
 		if (embellishments) {
 			output = `${config.combatRoles[user.combatRole]} ${output}`;
@@ -449,7 +451,10 @@ class BARun {
 			}
 
 			if (deleteThreads) await thread.delete().catch(handleError);
-			else await thread.setLocked(true).catch(handleError);
+			else {
+				await thread.setLocked(true).catch(handleError);
+				await thread.setArchived(true).catch(handleError);
+			}
 		}
 
 		// delete all run messages (embeds and reserve thread message)
@@ -461,15 +466,16 @@ class BARun {
 	}
 
 	// send something to the audit log
-	async log(client, message) {
+	async log(client, user, message, color = undefined) {
 		const signupChannel = await this.fetchSignupChannel(client);
 		const thread = await signupChannel.threads.fetch(this.auditLogThread);
 
 		const now = Math.floor(Date.now() / 1000);
-		const header = sprintf(strings.msgAuditHeader, { time: now });
+		const footer = sprintf(strings.msgAuditFooter, { time: now });
 		const embed = new MessageEmbed()
-			.setTitle(header)
-			.setDescription(message);
+			.setTitle(user.nickname != undefined ? user.nickname : user.username)
+			.setDescription(`${message}\n\n${footer}`);
+		if (color != undefined) embed.setColor(color);
 		await thread.send({ embeds: [embed] });
 	}
 
@@ -490,11 +496,12 @@ class BARun {
 		const existing = this.checkExisting(incomingUser);
 		const baUser = existing?.user != undefined ? existing.user : new BAUser(incomingUser, nickname);
 		let changed = false;
-		let auditMessage;
+		let auditMessage, auditColor;
 
 		if (element == existing.lead) {
 			changed = this.leadRemove(baUser, element);
 			auditMessage = strings.msgAuditLeaveLead;
+			auditColor = auditColors.red;
 		}
 		else if (this.leads[element] != null) {
 			// existing lead
@@ -507,13 +514,16 @@ class BARun {
 				if (existing.lead) {
 					this.leadRemove(baUser, existing.lead);
 					auditMessage = strings.msgAuditMoveLead;
+					auditColor = auditColors.yellow;
 				}
 				else if (existing.party) {
 					this.partyRemove(baUser, existing.party);
 					auditMessage = strings.msgAuditPromoteLead;
+					auditColor = auditColors.purple;
 				}
 				else {
 					auditMessage = strings.msgAuditJoinLead;
+					auditColor = auditColors.green;
 				}
 			}
 		}
@@ -527,7 +537,7 @@ class BARun {
 				newLead: this.formatPartyLeadSimple(element),
 				oldParty: this.formatPartyNameSimple(element),
 			};
-			await this.log(interaction.client, sprintf(auditMessage, args));
+			await this.log(interaction.client, baUser, sprintf(auditMessage, args), auditColor);
 		}
 		return changed;
 	}
@@ -541,9 +551,23 @@ class BARun {
 		else if (this.lockParties) return false;
 
 		const existing = this.checkExisting(incomingUser);
+
+		if (existing.lead && this.lockLeads) {
+			// ephemeral reply
+			await interaction.reply({ content: 'Can\'t change to reserves, you\'re a lead and parties are locked. (Replace this message later.)',
+				ephemeral: true });
+			return false;
+		}
+		if (existing.party != elements.reserve && this.lockParties) {
+			// ephemeral reply
+			await interaction.reply({ content: 'Can\'t change to reserves, you\'re in a main party and parties are locked. (Replace this message later.)',
+				ephemeral: true });
+			return false;
+		}
+
 		const baUser = existing?.user != undefined ? existing.user : new BAUser(incomingUser, nickname);
 		let changed = false;
-		let auditMessage;
+		let auditMessage, auditColor;
 
 		if (existing.lead) {
 			// not allowed to step down from lead without explicitly doing so
@@ -557,6 +581,7 @@ class BARun {
 		else if (element == existing.party) {
 			changed = this.partyRemove(baUser, element);
 			auditMessage = strings.msgAuditLeaveParty;
+			auditColor = auditColors.red;
 		}
 		else if (this.roster[element].length >= config.maxPartySize - 1) {
 			await interaction.reply({ content: 'Unable to join, party is full. (Replace this message later.)',
@@ -569,9 +594,11 @@ class BARun {
 				if (existing.party) {
 					this.partyRemove(baUser, existing.party);
 					auditMessage = strings.msgAuditMoveParty;
+					auditColor = auditColors.yellow;
 				}
 				else {
 					auditMessage = strings.msgAuditJoinParty;
+					auditColor = auditColors.green;
 				}
 			}
 		}
@@ -583,7 +610,7 @@ class BARun {
 				oldParty: this.formatPartyNameSimple(existing.party),
 				newParty: this.formatPartyNameSimple(element),
 			};
-			await this.log(interaction.client, sprintf(auditMessage, args));
+			await this.log(interaction.client, baUser, sprintf(auditMessage, args), auditColor);
 		}
 		return changed;
 	}
@@ -594,8 +621,17 @@ class BARun {
 
 		// if not signed up...
 		if (!existing.lead && !existing.party) {
-			// ephemeral reply
 			await interaction.reply({ content: sprintf(strings.msgSetCombatRoleBeforeSignup, { runId: this.runId }),
+				ephemeral: true });
+			return false;
+		}
+		if (existing.lead && this.lockLeads) {
+			await interaction.reply({ content: 'Can\'t change role, you\'re a lead and roles are locked in. (Replace this message later.)',
+				ephemeral: true });
+			return false;
+		}
+		if (existing.party != elements.reserve && this.lockParties) {
+			await interaction.reply({ content: 'Can\'t change role, you\'re in a main party and roles are locked in. (Replace this message later.)',
 				ephemeral: true });
 			return false;
 		}
@@ -628,7 +664,7 @@ class BARun {
 				newRoleIcon: config.combatRoles[combatRole],
 				newRole: combatRole,
 			};
-			await this.log(interaction.client, sprintf(strings.msgAuditChangeRole, args));
+			await this.log(interaction.client, baUser, sprintf(strings.msgAuditChangeRole, args), auditColors.grey);
 		}
 		return changed;
 	}
@@ -663,8 +699,12 @@ class BARun {
 				time: this.timeNotifyParties,
 			};
 
-			await this.leads[element].send(sprintf(strings.msgNotifyLeads, args))
-				.catch(console.error);
+			try {
+				const leadUser = await client.users.fetch(this.leads[element].id);
+				await leadUser.send(sprintf(strings.msgNotifyLeads, args))
+					.catch(console.error);
+			}
+			catch (err) { handleError(err); }
 		}
 
 		this.lockLeads = true;
@@ -706,6 +746,7 @@ class BARun {
 			const args = {
 				runId: this.runId,
 				elementParty: this.formatPartyNameSimple(element),
+				icon: config.icons[element],
 				element: _.capitalize(element),
 				password: this.passwords[element],
 				partyLead: this.formatUser(this.leads[element], false, true),

@@ -70,7 +70,7 @@ const strings = {
 		'Here is an "audit log" thread that logs changes to the roster. ' +
 		'It will be updated as users interact with the signup for your run.',
 
-	msgAuditHeader: '[<t:%(time)s:d> <t:%(time)s:T>, <t:%(time)s:R>]',
+	msgAuditFooter: '<t:%(time)s:d> <t:%(time)s:T>, <t:%(time)s:R>',
 	msgAuditJoinLead: '%(user)s signed up as %(newLead)s.',
 	msgAuditMoveLead: '%(user)s changed lead element: %(oldLead)s → %(newLead)s',
 	msgAuditPromoteLead: '%(user)s promoted to lead: %(oldParty)s → %(newLead)s',

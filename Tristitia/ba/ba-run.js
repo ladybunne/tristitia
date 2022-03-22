@@ -1,8 +1,9 @@
-/* eslint-disable quotes */
 const _ = require('lodash');
 const { sprintf } = require('sprintf-js');
 const { MessageEmbed, MessageActionRow, MessageButton } = require('discord.js');
 const { handleError } = require('../common');
+const { BAUser, combatRoles } = require('./ba-user');
+const { strings } = require('./ba-strings');
 const config = require('../config.json');
 
 const elements = Object.freeze({
@@ -10,92 +11,6 @@ const elements = Object.freeze({
 	fire: 'fire', lightning: 'lightning', ice: 'ice',
 	support: 'support', reserve: 'reserve',
 });
-
-const combatRoles = Object.freeze({
-	tank: 'tank',
-	healer: 'healer',
-	dps: 'dps',
-});
-
-const msgCreationText = 'Created run #%(id)s, led by %(raidLead)s, scheduled for <t:%(time)s:F>, <t:%(time)s:R>.';
-const msgCancelText = 'Cancelled run #%(id)s, previously scheduled for <t:%(time)s:F>, <t:%(time)s:R>.';
-
-const msgEmbedDescription = '**Raid Lead**: %(raidLead)s\n' +
-	'**Time**: <t:%(time)s:F>, <t:%(time)s:R>';
-
-const msgEmbedPartyTitle = `%(partyElement)s (%(partyCount)s)`;
-
-const msgLeadSwapToMember = '**Unable to join %(elementParty)s**. ' +
-	'You are currently registered as %(elementLead)s.\n' +
-    'Please unregister from the lead position, by clicking the button again, if you wish to join a party as a non-lead.';
-
-const msgSetCombatRoleBeforeSignup = '**Unable to change combat role for Run #%(runId)s**.\n' +
-	'You are not currently signed up for Run #%(runId)s. Please sign up for the run, then click a button to change your combat role.';
-
-const msgNotifyLeads = "Hello, %(partyLead)s! You are Run #%(runId)s's %(elementLead)s. " +
-	"It's time to put up your party!\n" +
-	"**The password for your party (%(element)s) is __%(password)s__**.\n\n" +
-
-	"Please put up your party ASAP, with the above password, under Adventuring Forays -> Eureka Hydatos.\n" +
-	"Copy this text and use it for the party description:\n" +
-	"```The Fire Place vs BA, Run #%(runId)s - %(element)s Party```\n" +
-
-	"Please ensure you have, in total, **1 tank**, **2 healers** and **5 any** slots listed, minus yourself.\n" +
-	"Leave all other settings untouched.\n\n" +
-
-	"Party members will receive passwords <t:%(time)s:R>, at <t:%(time)s:F>. " +
-	"Please have your party up and configured by then!\n\n" +
-
-	`If you have any questions about this process, please DM Athena (<@${config.botCreatorId}>)! Thank you!`;
-
-const msgNotifyParties = "Hello, members of Run #%(runId)s's %(elementParty)s! It's time to join your party!\n" +
-	"**The password for your party (%(element)s) is __%(password)s__**.\n\n" +
-
-	"Please look under Private in the Party Finder for your party. It should be listed under Adventuring Forays -> " +
-	"Eureka Hydatos, with **%(icon)s%(element)s** as the listed element and %(partyLead)s as the party lead.\n\n" +
-
-	"Please try and join before <t:%(time)s:F>, <t:%(time)s:R> - reserves will receive all passwords at that time!\n\n" +
-
-	"If you need help, feel free to ask here in this thread. your lead (%(partyLead)s) should see it. " +
-	"If it's urgent, ping them!\n\n" +
-
-	"If you have any questions about this process, please DM Athena! Thank you!";
-
-const msgNotifyReserves = "Hello, reserves of Run #%(runId)s! It's your time to shine!\n" +
-	"Below are the passwords to **ALL parties**. With these, you can fill any remaining spots! Go go!\n\n" +
-
-	"%(passwordList)s\n\n" +
-
-	"If any parties are still up, they'll be under Private in the Party Finder. They should be listed under " +
-	"Adventuring Forays -> Eureka Hydatos, with the element in the description.\n\n" +
-
-	"Act now! There's no guarantee that there _are_ open spots. If there aren't, I'm sorry!\n" +
-	"Please still come into the instance either way - having people on hand is always helpful, and who knows? " +
-	"You might end up on the run after all, if emergency fills are needed!\n\n" +
-
-	"If you have any questions about this process, please DM Athena! Thank you!";
-
-const msgAuditLogThreadName = "Run No. %(runId)s - Audit Log";
-const msgPartiesThreadName = "Run No. %(runId)s - %(element)s Party";
-const msgReservesThreadName = "Run No. %(runId)s - Reserves + Public";
-
-const msgReservesThreadMessage = "Run #%(runId)s's passwords are now PUBLIC! See the below thread for details!";
-
-const msgAuditLogThreadCreate = 'Hi, %(raidLead)s of Run #%(runId)s!\n\n' +
-
-	'Here is an "audit log" thread that logs changes to the roster. ' +
-	'It will be updated as users interact with the signup for your run.';
-
-const msgAuditHeader = '[<t:%(time)s:d> <t:%(time)s:T>, <t:%(time)s:R>]';
-const msgAuditJoinLead = '%(user)s signed up as %(newLead)s.';
-const msgAuditMoveLead = '%(user)s changed lead element: %(oldLead)s → %(newLead)s';
-const msgAuditPromoteLead = '%(user)s promoted to lead: %(oldParty)s → %(newLead)s';
-const msgAuditLeaveLead = '%(user)s withdrew from %(oldLead)s.';
-const msgAuditJoinParty = '%(user)s joined %(newParty)s.';
-const msgAuditMoveParty = '%(user)s moved party: %(oldParty)s -> %(newParty)s';
-const msgAuditLeaveParty = '%(user)s left %(oldParty)s.';
-const msgAuditChangeRole = '%(user)s changed role: ' +
-	'%(oldRoleIcon)s **%(oldRole)s** → %(newRoleIcon)s **%(newRole)s**';
 
 class BARun {
 	constructor(runId, raidLead, time) {
@@ -163,7 +78,7 @@ class BARun {
 			.setThumbnail(this.raidLead.displayAvatarURL());
 
 		const descriptionArgs = { raidLead: this.formatUser(this.raidLead), time: this.time };
-		const description = sprintf(msgEmbedDescription + `\n${config.spEmoji}`, descriptionArgs);
+		const description = sprintf(strings.msgEmbedDescription + `\n${config.spEmoji}`, descriptionArgs);
 
 		embed.setDescription(description);
 
@@ -184,7 +99,7 @@ class BARun {
 			.setColor(this.raidLead.hexAccentColor);
 
 		const descriptionArgs = { raidLead: this.formatUser(this.raidLead), time: this.time };
-		const description = sprintf(msgEmbedDescription + `\n${config.spEmoji}`, descriptionArgs);
+		const description = sprintf(strings.msgEmbedDescription + `\n${config.spEmoji}`, descriptionArgs);
 
 		embed.setDescription(description);
 
@@ -286,13 +201,13 @@ class BARun {
 	// response to run creation
 	get creationText() {
 		const args = { id: this.runId, raidLead: this.formatUser(this.raidLead, false, true), time: this.time };
-		return sprintf(msgCreationText, args);
+		return sprintf(strings.msgCreationText, args);
 	}
 
 	// response to run cancellation
 	get cancelText() {
 		const args = { id: this.runId, time: this.time };
-		return sprintf(msgCancelText, args);
+		return sprintf(strings.msgCancelText, args);
 	}
 
 	// ---------------------------------------- Formatting ----------------------------------------
@@ -360,7 +275,7 @@ class BARun {
 			partyCount = `${this.calculatePartyMemberCount(element)}/${config.maxPartySize}`;
 		}
 
-		return sprintf(msgEmbedPartyTitle, { partyElement: partyElement, partyCount: partyCount });
+		return sprintf(strings.msgEmbedPartyTitle, { partyElement: partyElement, partyCount: partyCount });
 	}
 
 	// format party roster for use in embeds or threads
@@ -394,7 +309,7 @@ class BARun {
 		const signupChannel = await this.fetchSignupChannel(client);
 
 		const thread = await signupChannel.threads.create({
-			name: sprintf(msgAuditLogThreadName, { runId: this.runId }),
+			name: sprintf(strings.msgAuditLogThreadName, { runId: this.runId }),
 			autoArchiveDuration: 'MAX',
 			invitable: false,
 			type: 'GUILD_PRIVATE_THREAD',
@@ -406,7 +321,7 @@ class BARun {
 			raidLead: this.formatUser(this.raidLead, false, true),
 			runId: this.runId,
 		};
-		await thread.send(sprintf(msgAuditLogThreadCreate, args));
+		await thread.send(sprintf(strings.msgAuditLogThreadCreate, args));
 	}
 
 	// send embeds to signup channel
@@ -431,26 +346,25 @@ class BARun {
 
 	// check if someone is already signed up, and return details if they are
 	checkExisting(user) {
-		const lead = Object.values(elements).find(element => this.leads[element] && this.leads[element].id == user.id);
-		const party = Object.values(elements).find(element => this.roster[element].some(member => member.id == user.id));
+		let existingUser, lead, party;
+		for (const element of Object.values(elements)) {
+			// lead
+			if (element != elements.reserve && this.leads[element]?.id == user.id) {
+				existingUser = this.leads[element];
+				lead = element;
+				break;
+			}
 
-		return { lead: lead, party: party };
-	}
-
-	// get existing combat role if present
-	getExistingCombatRole(user) {
-		let role;
-		for (const party of Object.values(this.roster)) {
-			const foundUser = party.find(member => member.id == user.id);
-			if (foundUser != undefined) {
-				console.log(foundUser.id);
-				role = foundUser.combatRole;
+			// party
+			const possibleMember = this.roster[element].find(member => member.id == user.id);
+			if (possibleMember) {
+				existingUser = possibleMember;
+				party = element;
 				break;
 			}
 		}
 
-		console.log(`incoming: ${user.combatRole} vs existing: ${role}`);
-		return role;
+		return { user: existingUser, lead: lead, party: party };
 	}
 
 	// add a party lead
@@ -552,11 +466,10 @@ class BARun {
 		const thread = await signupChannel.threads.fetch(this.auditLogThread);
 
 		const now = Math.floor(Date.now() / 1000);
-		const header = sprintf(msgAuditHeader, { time: now });
+		const header = sprintf(strings.msgAuditHeader, { time: now });
 		const embed = new MessageEmbed()
 			.setTitle(header)
-			.setDescription(message)
-			.setTimestamp();
+			.setDescription(message);
 		await thread.send({ embeds: [embed] });
 	}
 
@@ -571,16 +484,17 @@ class BARun {
 	}
 
 	// logic for lead signup request
-	async signupLead(interaction, user, element) {
+	async signupLead(interaction, incomingUser, element, nickname = undefined) {
 		if (this.lockLeads) return false;
 
-		const existing = this.checkExisting(user);
+		const existing = this.checkExisting(incomingUser);
+		const baUser = existing?.user != undefined ? existing.user : new BAUser(incomingUser, nickname);
 		let changed = false;
 		let auditMessage;
 
 		if (element == existing.lead) {
-			changed = this.leadRemove(user, element);
-			auditMessage = msgAuditLeaveLead;
+			changed = this.leadRemove(baUser, element);
+			auditMessage = strings.msgAuditLeaveLead;
 		}
 		else if (this.leads[element] != null) {
 			// existing lead
@@ -588,18 +502,18 @@ class BARun {
 			return false;
 		}
 		else {
-			changed = this.leadAdd(user, element);
+			changed = this.leadAdd(baUser, element);
 			if (changed) {
 				if (existing.lead) {
-					this.leadRemove(user, existing.lead);
-					auditMessage = msgAuditMoveLead;
+					this.leadRemove(baUser, existing.lead);
+					auditMessage = strings.msgAuditMoveLead;
 				}
 				else if (existing.party) {
-					this.partyRemove(user, existing.party);
-					auditMessage = msgAuditPromoteLead;
+					this.partyRemove(baUser, existing.party);
+					auditMessage = strings.msgAuditPromoteLead;
 				}
 				else {
-					auditMessage = msgAuditJoinLead;
+					auditMessage = strings.msgAuditJoinLead;
 				}
 			}
 		}
@@ -608,7 +522,7 @@ class BARun {
 			await interaction.update({ embeds: [this.embedOverview], components: this.buttonsOverview });
 			await this.updateEmbeds(interaction.client, false, true);
 			const args = {
-				user: this.formatUser(user, false, false),
+				user: this.formatUser(baUser, false, false),
 				oldLead: this.formatPartyLeadSimple(existing.lead),
 				newLead: this.formatPartyLeadSimple(element),
 				oldParty: this.formatPartyNameSimple(element),
@@ -620,13 +534,14 @@ class BARun {
 
 	// logic for party signup request
 	// TODO add feedback when you try and join a full party.
-	async signupParty(interaction, user, element) {
+	async signupParty(interaction, incomingUser, element, nickname = undefined) {
 		if (element == elements.reserve) {
 			if (this.lockReserves) return false;
 		}
 		else if (this.lockParties) return false;
 
-		const existing = this.checkExisting(user);
+		const existing = this.checkExisting(incomingUser);
+		const baUser = existing?.user != undefined ? existing.user : new BAUser(incomingUser, nickname);
 		let changed = false;
 		let auditMessage;
 
@@ -636,12 +551,12 @@ class BARun {
 				elementParty: this.formatPartyNameSimple(element, false),
 				elementLead: this.formatPartyLeadSimple(existing.lead),
 			};
-			await interaction.reply({ content: sprintf(msgLeadSwapToMember, args), ephemeral: true });
+			await interaction.reply({ content: sprintf(strings.msgLeadSwapToMember, args), ephemeral: true });
 			return false;
 		}
 		else if (element == existing.party) {
-			changed = this.partyRemove(user, element);
-			auditMessage = msgAuditLeaveParty;
+			changed = this.partyRemove(baUser, element);
+			auditMessage = strings.msgAuditLeaveParty;
 		}
 		else if (this.roster[element].length >= config.maxPartySize - 1) {
 			await interaction.reply({ content: 'Unable to join, party is full. (Replace this message later.)',
@@ -649,14 +564,14 @@ class BARun {
 			return;
 		}
 		else {
-			changed = this.partyAdd(user, element);
+			changed = this.partyAdd(baUser, element);
 			if (changed) {
 				if (existing.party) {
-					this.partyRemove(user, existing.party);
-					auditMessage = msgAuditMoveParty;
+					this.partyRemove(baUser, existing.party);
+					auditMessage = strings.msgAuditMoveParty;
 				}
 				else {
-					auditMessage = msgAuditJoinParty;
+					auditMessage = strings.msgAuditJoinParty;
 				}
 			}
 		}
@@ -664,7 +579,7 @@ class BARun {
 		if (changed) {
 			await interaction.update({ embeds: [this.embedRoster], components: this.buttonsRoster });
 			const args = {
-				user: this.formatUser(user, false, false),
+				user: this.formatUser(baUser, false, false),
 				oldParty: this.formatPartyNameSimple(existing.party),
 				newParty: this.formatPartyNameSimple(element),
 			};
@@ -674,14 +589,13 @@ class BARun {
 	}
 
 	// logic for set combat role request
-	async setCombatRole(interaction, user, combatRole) {
-		const existing = this.checkExisting(user);
-		let changed = false;
+	async setCombatRole(interaction, incomingUser, combatRole) {
+		const existing = this.checkExisting(incomingUser);
 
 		// if not signed up...
 		if (!existing.lead && !existing.party) {
-			// send a DM explaining you need to sign up before changing your combat role
-			await interaction.reply({ content: sprintf(msgSetCombatRoleBeforeSignup, { runId: this.runId }),
+			// ephemeral reply
+			await interaction.reply({ content: sprintf(strings.msgSetCombatRoleBeforeSignup, { runId: this.runId }),
 				ephemeral: true });
 			return false;
 		}
@@ -691,31 +605,30 @@ class BARun {
 		if (existing.party && existing.party != elements.reserve && this.lockParties) return false;
 		if (existing.party == elements.reserve && this.lockReserves) return false;
 
-		let originalUser;
-		if (existing.lead) originalUser = this.leads[existing.lead];
-		else if (existing.party) originalUser = this.roster[existing.party].find(partyMember => partyMember.id == user.id);
+		const baUser = existing.user;
+		let changed = false;
 
-		const oldCombatRole = originalUser.combatRole;
+		const oldCombatRole = baUser.combatRole;
 
 		if (oldCombatRole == combatRole) {
 			await interaction.reply({ content: 'Same role. (Replace this message later.)', ephemeral: true });
 			return false;
 		}
 		else {
-			originalUser.combatRole = combatRole;
+			baUser.combatRole = combatRole;
 			changed = true;
 		}
 
 		if (changed) {
 			await interaction.update({ embeds: [this.embedRoster], components: this.buttonsRoster });
 			const args = {
-				user: this.formatUser(user),
+				user: this.formatUser(baUser),
 				oldRoleIcon: config.combatRoles[oldCombatRole],
 				oldRole: oldCombatRole,
 				newRoleIcon: config.combatRoles[combatRole],
 				newRole: combatRole,
 			};
-			await this.log(interaction.client, sprintf(msgAuditChangeRole, args));
+			await this.log(interaction.client, sprintf(strings.msgAuditChangeRole, args));
 		}
 		return changed;
 	}
@@ -750,7 +663,7 @@ class BARun {
 				time: this.timeNotifyParties,
 			};
 
-			await this.leads[element].send(sprintf(msgNotifyLeads, args))
+			await this.leads[element].send(sprintf(strings.msgNotifyLeads, args))
 				.catch(console.error);
 		}
 
@@ -780,7 +693,7 @@ class BARun {
 
 			// create thread
 			const thread = await signupChannel.threads.create({
-				name: sprintf(msgPartiesThreadName, { runId: this.runId, element: _.capitalize(element) }),
+				name: sprintf(strings.msgPartiesThreadName, { runId: this.runId, element: _.capitalize(element) }),
 				autoArchiveDuration: 60,
 				type: 'GUILD_PRIVATE_THREAD',
 			});
@@ -799,7 +712,7 @@ class BARun {
 				time: this.timeNotifyReserves,
 			};
 
-			await thread.send(formattedRoster + sprintf(msgNotifyParties, args))
+			await thread.send(formattedRoster + sprintf(strings.msgNotifyParties, args))
 				.catch(console.error);
 		}
 
@@ -814,10 +727,10 @@ class BARun {
 		const signupChannel = await this.fetchSignupChannel(client);
 
 		const reserveThreadMessage = await signupChannel.send(
-			sprintf(msgReservesThreadMessage, { runId: this.runId }));
+			sprintf(strings.msgReservesThreadMessage, { runId: this.runId }));
 
 		const thread = await reserveThreadMessage.startThread({
-			name: sprintf(msgReservesThreadName, { runId: this.runId }),
+			name: sprintf(strings.msgReservesThreadName, { runId: this.runId }),
 			autoArchiveDuration: 60,
 		});
 
@@ -834,7 +747,7 @@ class BARun {
 			passwordList: passwordList,
 		};
 
-		await thread.send(formattedRoster + sprintf(msgNotifyReserves, args))
+		await thread.send(formattedRoster + sprintf(strings.msgNotifyReserves, args))
 			.catch(console.error);
 
 		this.lockReserves = true;

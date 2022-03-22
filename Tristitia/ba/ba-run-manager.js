@@ -167,25 +167,25 @@ async function updateEmbeds(client) {
 }
 
 // external lead signup request
-async function signupLead(interaction, user, runId, element) {
+async function signupLead(interaction, user, runId, element, nickname = undefined) {
 	const lookup = lookupRunById(runId);
 	if (!lookup.run) {
 		console.log(`Couldn't sign up as lead for Run #${runId}. Reason: ${lookup.state}`);
 		return;
 	}
-	const outcome = await lookup.run.signupLead(interaction, user, element);
+	const outcome = await lookup.run.signupLead(interaction, user, element, nickname);
 	if (outcome) await saveRuns();
 	return outcome;
 }
 
 // external party signup request
-async function signupParty(interaction, user, runId, element) {
+async function signupParty(interaction, user, runId, element, nickname = undefined) {
 	const lookup = lookupRunById(runId);
 	if (!lookup.run) {
 		console.log(`Couldn't sign up as party for Run #${runId}. Reason: ${lookup.state}`);
 		return;
 	}
-	const outcome = await lookup.run.signupParty(interaction, user, element);
+	const outcome = await lookup.run.signupParty(interaction, user, element, nickname);
 	if (outcome) await saveRuns();
 	return outcome;
 }

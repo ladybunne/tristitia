@@ -37,15 +37,15 @@ async function process(interaction) {
 }
 
 async function signupLead(interaction, runId, element) {
-	await rm.signupLead(interaction, rm.convertMemberToUser(interaction.member), runId, element);
+	await rm.signupLead(interaction, interaction.member.user, runId, element, interaction.member.nickname);
 }
 
 async function signupParty(interaction, runId, element) {
-	await rm.signupParty(interaction, rm.convertMemberToUser(interaction.member), runId, element);
+	await rm.signupParty(interaction, interaction.member.user, runId, element, interaction.member.nickname);
 }
 
 async function setCombatRole(interaction, runId, combatRole) {
-	await rm.setCombatRole(interaction, rm.convertMemberToUser(interaction.member), runId, combatRole);
+	await rm.setCombatRole(interaction, interaction.member.user, runId, combatRole);
 }
 
 exports.process = process;

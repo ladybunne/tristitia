@@ -10,12 +10,6 @@ const strings = {
 
 	msgEmbedPartyTitle: `%(partyElement)s (%(partyCount)s)`,
 
-	msgLeadSwapToMember: '**Unable to join %(elementParty)s**. You are currently registered as %(elementLead)s.\n' +
-		'Please unregister from the lead position, by clicking the button again, if you wish to join a party as a non-lead.',
-
-	msgSetCombatRoleBeforeSignup: '**Unable to change combat role for Run #%(runId)s**.\n' +
-		'You are not currently signed up for Run #%(runId)s. Please sign up for the run, then click a button to change your combat role.',
-
 	msgNotifyLeads: "Hello, %(partyLead)s! You are Run #%(runId)s's %(elementLead)s. " +
 		"It's time to put up your party!\n" +
 		"**The password for your party (%(element)s) is __%(password)s__**.\n\n" +
@@ -64,6 +58,21 @@ const strings = {
 	msgReservesThreadName: "Run No. %(runId)s - Reserves + Public",
 
 	msgReservesThreadMessage: "Run #%(runId)s's passwords are now PUBLIC! See the below thread for details!",
+
+	msgErrLeadPositionTaken: '**Unable to sign up as %(elementLead)s**. That position is already taken.',
+
+	msgErrLeadDemote: '**Unable to join %(elementParty)s**. You are currently registered as %(elementLead)s.\n' +
+		'Please unregister from the lead position, by clicking the button again, if you wish to join a party as a non-lead.',
+	msgErrPartyFull: '**Unable to join %(elementParty)s**. This party is full.',
+	msgErrJoinPartyLeadsLocked: '**Unable to join %(elementParty)s.** You are %(elementLead)s and leads are locked in.',
+	msgErrJoinReservesPartiesLocked: '**Unable to join Reserves.** You are in %(elementParty)s and parties are locked in.',
+
+	msgErrCombatRoleNoSignup: '**Unable to change combat role**. You are not currently signed up for Run #%(runId)s.\n' +
+		'Please sign up for the run, then click a button to change your combat role.',
+
+	msgErrCombatRoleSame: '**Unable to change combat role**. You are already a %(role)s!',
+	msgErrCombatRoleLeadsLocked: '**Unable to change combat role**. You are %(elementLead)s and lead roles are locked in.',
+	msgErrCombatRolePartiesLocked: '**Unable to change combat role**. You are in %(elementParty)s and party roles are locked in.',
 
 	msgAuditLogThreadCreate: 'Hi, %(raidLead)s of Run #%(runId)s!\n\n' +
 

@@ -505,7 +505,8 @@ class BARun {
 		}
 		else if (this.leads[element] != null) {
 			// existing lead
-			await interaction.reply({ content: 'Existing lead. (Replace this message later.)', ephemeral: true });
+			await interaction.reply({ content: sprintf(strings.msgErrLeadPositionTaken,
+				{ elementLead: this.formatPartyLeadSimple(element, false) }), ephemeral: true });
 			return false;
 		}
 		else {
@@ -554,14 +555,19 @@ class BARun {
 
 		if (existing.lead && this.lockLeads) {
 			// ephemeral reply
-			await interaction.reply({ content: 'Can\'t change to reserves, you\'re a lead and parties are locked. (Replace this message later.)',
-				ephemeral: true });
+			await interaction.reply({ content: sprintf(strings.msgErrJoinPartyLeadsLocked,
+				{
+					elementParty: this.formatPartyNameSimple(element, false),
+					elementLead: this.formatPartyLeadSimple(existing.lead),
+				}),
+			ephemeral: true });
 			return false;
 		}
 		if (existing.party != elements.reserve && this.lockParties) {
 			// ephemeral reply
-			await interaction.reply({ content: 'Can\'t change to reserves, you\'re in a main party and parties are locked. (Replace this message later.)',
-				ephemeral: true });
+			await interaction.reply({ content: sprintf(strings.msgErrJoinReservesPartiesLocked,
+				{ elementParty: this.formatPartyNameSimple(existing.party, false) }),
+			ephemeral: true });
 			return false;
 		}
 
@@ -571,11 +577,12 @@ class BARun {
 
 		if (existing.lead) {
 			// not allowed to step down from lead without explicitly doing so
-			const args = {
-				elementParty: this.formatPartyNameSimple(element, false),
-				elementLead: this.formatPartyLeadSimple(existing.lead),
-			};
-			await interaction.reply({ content: sprintf(strings.msgLeadSwapToMember, args), ephemeral: true });
+			await interaction.reply({ content: sprintf(strings.msgErrLeadDemote,
+				{
+					elementParty: this.formatPartyNameSimple(element, false),
+					elementLead: this.formatPartyLeadSimple(existing.lead),
+				}),
+			ephemeral: true });
 			return false;
 		}
 		else if (element == existing.party) {
@@ -584,8 +591,8 @@ class BARun {
 			auditColor = auditColors.red;
 		}
 		else if (this.roster[element].length >= config.maxPartySize - 1) {
-			await interaction.reply({ content: 'Unable to join, party is full. (Replace this message later.)',
-				ephemeral: true });
+			await interaction.reply({ content: sprintf(strings.msgErrPartyFull,
+				{ elementParty: this.formatPartyNameSimple(element, false) }), ephemeral: true });
 			return;
 		}
 		else {
@@ -621,18 +628,18 @@ class BARun {
 
 		// if not signed up...
 		if (!existing.lead && !existing.party) {
-			await interaction.reply({ content: sprintf(strings.msgSetCombatRoleBeforeSignup, { runId: this.runId }),
-				ephemeral: true });
+			await interaction.reply({ content: sprintf(strings.msgErrCombatRoleNoSignup,
+				{ runId: this.runId }), ephemeral: true });
 			return false;
 		}
 		if (existing.lead && this.lockLeads) {
-			await interaction.reply({ content: 'Can\'t change role, you\'re a lead and roles are locked in. (Replace this message later.)',
-				ephemeral: true });
+			await interaction.reply({ content: sprintf(strings.msgErrCombatRoleLeadsLocked,
+				{ elementLead: this.formatPartyLeadSimple(existing.lead) }), ephemeral: true });
 			return false;
 		}
 		if (existing.party != elements.reserve && this.lockParties) {
-			await interaction.reply({ content: 'Can\'t change role, you\'re in a main party and roles are locked in. (Replace this message later.)',
-				ephemeral: true });
+			await interaction.reply({ content: sprintf(strings.msgErrCombatRolePartiesLocked,
+				{ elementLead: this.formatPartyLeadSimple(existing.party) }), ephemeral: true });
 			return false;
 		}
 
@@ -647,7 +654,8 @@ class BARun {
 		const oldCombatRole = baUser.combatRole;
 
 		if (oldCombatRole == combatRole) {
-			await interaction.reply({ content: 'Same role. (Replace this message later.)', ephemeral: true });
+			await interaction.reply({ content: sprintf(strings.msgErrCombatRoleSame,
+				{ combatRole: `${config.combatRoles[combatRole]} **${combatRole}**` }), ephemeral: true });
 			return false;
 		}
 		else {

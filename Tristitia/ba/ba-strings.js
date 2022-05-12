@@ -1,9 +1,21 @@
 /* eslint-disable quotes */
 const config = require('../config.json');
 
+// TODO Clean this up and probably move the server-specific stuff to a config file.
+
+
 const strings = {
 	msgCreationText: 'Created run #%(id)s, led by %(raidLead)s, scheduled for <t:%(time)s:F>, <t:%(time)s:R>.',
 	msgCancelText: 'Cancelled run #%(id)s, previously scheduled for <t:%(time)s:F>, <t:%(time)s:R>.',
+
+	msgCalendarEventName: 'The Fire Place vs BA, Run %(id)s',
+	msgCalendarEventLocation: 'Eureka Hydatos (Materia)',
+	msgCalendarEventDescription: 'Join The Fire Place on a foray into The Baldesion Arsenal!\n' +
+		'\n' +
+		"Signups for this run are managed by Tristitia, The Fire Place's BA Discord bot.\n" +
+		"Click this link to be taken to the signup channel: https://discord.com/channels/931496853873238046/943732635597963294 \n" +
+		"If that doesn't work, please ensure you've picked up the Eureka and Baldesion Arsenal roles from " +
+		"#role-assign-content.\n",
 
 	msgEmbedDescription: '**Raid Lead**: %(raidLead)s\n' +
 		'**Time**: <t:%(time)s:F>, <t:%(time)s:R>',

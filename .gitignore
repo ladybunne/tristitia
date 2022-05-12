@@ -96,6 +96,7 @@ Thumbs.db
 token.txt
 config.json
 config-*.json
+credentials.json
 
 # This is just local storage.
 future_runs.json

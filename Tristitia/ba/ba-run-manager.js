@@ -1,9 +1,13 @@
 const _ = require('lodash');
+const { sprintf } = require('sprintf-js');
 const fs = require('fs/promises');
 const schedule = require('node-schedule');
 const { BARun, elements, convertMemberToUser } = require('./ba-run');
+const cm = require('../calendar-manager');
 const { handleError } = require('../common');
+const { strings } = require('./ba-strings');
 const config = require('../config.json');
+const { DataResolver } = require('discord.js');
 
 // now with new and improved persistence!
 let futureRuns = [];
@@ -101,6 +105,16 @@ async function newRun(interaction, time) {
 	await run.sendEmbeds(interaction.client);
 
 	scheduleNotifyEvents(interaction.client, run);
+
+	// add event to Google Calendar
+	const startTime = new Date(time * 1000).toISOString();
+	const endTime = new Date((time + config.finishTimeDelta * 60) * 1000).toISOString();
+
+	// TODO finish formatting the text tomorrow.
+	cm.addEvent(sprintf(strings.msgCalendarEventName),
+		strings.msgCalendarEventLocation,
+		strings.msgCalendarEventDescription,
+		startTime, endTime);
 
 	await saveRuns();
 

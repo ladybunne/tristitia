@@ -110,8 +110,7 @@ async function newRun(interaction, time) {
 	const startTime = new Date(time * 1000).toISOString();
 	const endTime = new Date((time + config.finishTimeDelta * 60) * 1000).toISOString();
 
-	// TODO finish formatting the text tomorrow.
-	cm.addEvent(sprintf(strings.msgCalendarEventName),
+	cm.addEvent(sprintf(strings.msgCalendarEventName, { id: runId }),
 		strings.msgCalendarEventLocation,
 		strings.msgCalendarEventDescription,
 		startTime, endTime);
@@ -161,6 +160,9 @@ async function cancelRun(interaction, runId) {
 	cancelledRuns.push(lookup.run);
 
 	await saveRuns();
+
+	// TODO cancel scheduled notify events
+	// TODO delete calendar event
 
 	return lookup.run.cancelText;
 }

@@ -18,17 +18,14 @@ See above.
 
 I have no plans to allow Tristitia to serve other servers at this time. That may change in the future.
 
---- 
-
 ## Credits
 
 Thanks to **Liam Galt** for getting me started on this project, and for providing solid tech advice. The project probably wouldn't have happened without him.
 
-Thanks to **Valla Von** for helping me debug the fresh hell that is JavaScript object manipulations and persistence.
+Thanks to **Valla Vonn** for helping me debug the fresh hell that is JavaScript object manipulations and persistence.
 
 Thanks to the following **beta testers**, for hopping in Discord and testing my jank in realtime:
 
-- Artemis
 - Crescendo
 - Licia
 - Maya

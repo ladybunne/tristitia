@@ -14,6 +14,8 @@ let futureRuns = [];
 let pastRuns = [];
 let cancelledRuns = [];
 
+const notifyJobs = new Map();
+
 async function saveRuns() {
 	await fs.writeFile(config.futureRunsFilename, JSON.stringify(futureRuns), handleError);
 	await fs.writeFile(config.pastRunsFilename, JSON.stringify(pastRuns), handleError);
@@ -70,10 +72,12 @@ function scheduleNotifyEvents(client, run) {
 	const timeNotifyReserves = new Date(run.timeNotifyReserves * 1000);
 	const timeFinish = new Date(run.timeFinish * 1000);
 
-	schedule.scheduleJob(timeNotifyLeads, notifyLeads);
-	schedule.scheduleJob(timeNotifyParties, notifyParties);
-	schedule.scheduleJob(timeNotifyReserves, notifyReserves);
-	schedule.scheduleJob(timeFinish, finish);
+	const jobNotifyLeads = schedule.scheduleJob(timeNotifyLeads, notifyLeads);
+	const jobNotifyParties = schedule.scheduleJob(timeNotifyParties, notifyParties);
+	const jobNotifyReserves = schedule.scheduleJob(timeNotifyReserves, notifyReserves);
+	const jobFinish = schedule.scheduleJob(timeFinish, finish);
+
+	notifyJobs.set(run.runId, [jobNotifyLeads, jobNotifyParties, jobNotifyReserves, jobFinish]);
 
 	// const now = Date.now();
 	// setTimeout(notifyLeads, run.timeNotifyLeads * 1000 - now);
@@ -161,7 +165,13 @@ async function cancelRun(interaction, runId) {
 
 	await saveRuns();
 
-	// TODO cancel scheduled notify events
+	// cancel scheduled notify events
+	try {
+		notifyJobs.get(runId).forEach(job => job.cancel());
+		notifyJobs.delete(runId);
+	}
+	catch (err) { handleError(err); }
+
 	// TODO delete calendar event
 
 	return lookup.run.cancelText;
@@ -184,6 +194,9 @@ async function finishRun(client, runId) {
 	// remove run from futureRuns
 	_.pull(futureRuns, lookup.run);
 	pastRuns.push(lookup.run);
+
+	try { notifyJobs.delete(runId); }
+	catch (err) { handleError(err); }
 
 	await saveRuns();
 }

@@ -733,6 +733,8 @@ class BARun {
 		const signupChannel = await this.fetchSignupChannel(client);
 
 		for (const element of Object.values(elements)) {
+			if (element == elements.reserve) continue;
+
 			// if empty, skip
 			// TODO this is bad if no party lead
 			// Currently it'll go ahead with a group of people that know a password...

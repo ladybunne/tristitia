@@ -78,12 +78,6 @@ function scheduleNotifyEvents(client, run) {
 	const jobFinish = schedule.scheduleJob(timeFinish, finish);
 
 	notifyJobs.set(run.runId, [jobNotifyLeads, jobNotifyParties, jobNotifyReserves, jobFinish]);
-
-	// const now = Date.now();
-	// setTimeout(notifyLeads, run.timeNotifyLeads * 1000 - now);
-	// setTimeout(notifyParties, run.timeNotifyParties * 1000 - now);
-	// setTimeout(notifyReserves, run.timeNotifyReserves * 1000 - now);
-	// setTimeout(finish, run.timeFinish * 1000 - now);
 }
 
 // create a new run, and add it to futureRuns
@@ -240,6 +234,21 @@ async function setCombatRole(interaction, user, runId, combatRole) {
 		return;
 	}
 	const outcome = await lookup.run.setCombatRole(interaction, user, combatRole);
+	if (outcome) await saveRuns();
+	return outcome;
+}
+
+async function moveMember(interaction, user, runId, target, element, lead = false) {
+	const lookup = lookupRunById(runId);
+	if (!lookup.run) {
+		console.log(`Couldn't move member for Run #${runId}. Reason: ${lookup.state}`);
+		return;
+	}
+	if (lookup.run.raidLead.id != interaction.member.user.id) {
+		return `You are not the raid lead of Run #${runId}! (You can't modify other people's rosters.)`;
+	}
+	const outcome = lead ? await lookup.run.signupLead(interaction, target, element) :
+		await lookup.run.signupParty(interaction, target, element);
 	if (outcome) await saveRuns();
 	return outcome;
 }

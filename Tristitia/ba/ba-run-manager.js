@@ -250,6 +250,7 @@ async function moveMember(interaction, user, runId, target, element, lead = fals
 	const outcome = lead ? await lookup.run.signupLead(interaction, target, element) :
 		await lookup.run.signupParty(interaction, target, element);
 	if (outcome) await saveRuns();
+	// TODO make this return some good words on a success
 	return outcome;
 }
 
@@ -263,3 +264,4 @@ exports.updateEmbeds = updateEmbeds;
 exports.signupLead = signupLead;
 exports.signupParty = signupParty;
 exports.setCombatRole = setCombatRole;
+exports.moveMember = moveMember;

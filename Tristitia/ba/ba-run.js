@@ -452,6 +452,7 @@ class BARun {
 
 			if (deleteThreads) await thread.delete().catch(handleError);
 			else {
+				await thread.setArchived(false).catch(handleError);
 				await thread.setLocked(true).catch(handleError);
 				await thread.setArchived(true).catch(handleError);
 			}
@@ -488,6 +489,10 @@ class BARun {
 		const guildMember = await guild.members.fetch(this.raidLead.id);
 		this.raidLead = convertMemberToUser(guildMember);
 	}
+
+	// TODO All of these button interaction functions assume they're getting called from a button.
+	// This is kind of a dumb assumption to make. It couples join/leave logic with UI updates, which is bad.
+
 
 	// logic for lead signup request
 	async signupLead(interaction, incomingUser, element, nickname = undefined) {
@@ -530,8 +535,21 @@ class BARun {
 		}
 
 		if (changed) {
-			await interaction.update({ embeds: [this.embedOverview], components: this.buttonsOverview });
-			await this.updateEmbeds(interaction.client, false, true);
+			// TODO This is bad handling of uncertain interaction types.
+			// this happens if it's a button interaction
+			try {
+				await interaction.update({ embeds: [this.embedOverview], components: this.buttonsOverview });
+				await this.updateEmbeds(interaction.client, false, true);
+			}
+			catch (error) {
+				// otherwise it's from somewhere else
+				if (error instanceof TypeError) {
+					await this.updateEmbeds(interaction.client, true, true);
+				}
+				// otherwise something went wrong
+				else handleError(error);
+			}
+
 			const args = {
 				user: this.formatUser(baUser, false, false),
 				oldLead: this.formatPartyLeadSimple(existing.lead),
@@ -611,7 +629,20 @@ class BARun {
 		}
 
 		if (changed) {
-			await interaction.update({ embeds: [this.embedRoster], components: this.buttonsRoster });
+			// TODO This is bad handling of uncertain interaction types.
+			// this happens if it's a button interaction
+			try {
+				await interaction.update({ embeds: [this.embedRoster], components: this.buttonsRoster });
+			}
+			catch (error) {
+				// otherwise it's from somewhere else
+				if (error instanceof TypeError) {
+					await this.updateEmbeds(interaction.client, false, true);
+				}
+				// otherwise something went wrong
+				else handleError(error);
+			}
+
 			const args = {
 				user: this.formatUser(baUser, false, false),
 				oldParty: this.formatPartyNameSimple(existing.party),

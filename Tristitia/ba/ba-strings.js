@@ -10,19 +10,20 @@ const strings = {
 
 	msgCalendarEventName: 'The Fire Place vs BA, Run #%(id)s',
 	msgCalendarEventLocation: 'Eureka Hydatos (Materia)',
-	msgCalendarEventDescription: "Venture alongside The Fire Place (https://discord.gg/thefireplace) " +
+	msgCalendarEventDescription: "Venture alongside <b>The Fire Place</b> (https://discord.gg/thefireplace) " +
 		"on a foray into The Baldesion Arsenal!\n" +
 		"\n" +
-		"Signups for this run are managed by Tristitia, The Fire Place's BA Discord bot.\n" +
+		"Signups for this run are managed by <b>Tristitia</b>, The Fire Place's BA Discord bot.\n" +
 		"\n" +
 		"Click this link to be taken to the signup channel: " +
 		"https://discord.com/channels/931496853873238046/943732635597963294 \n" +
 		"\n" +
 		"If that doesn't work, please ensure you've picked up the Eureka and Baldesion Arsenal roles from " +
-		"#role-assign-content.\n",
+		"#role-assign-content.",
 
 	msgEmbedDescription: '**Raid Lead**: %(raidLead)s\n' +
-		'**Time**: <t:%(time)s:F>, <t:%(time)s:R>',
+		'**Time**: <t:%(time)s:F>, <t:%(time)s:R>\n' +
+		'**Run Type**: %(runType)s',
 
 	msgEmbedPartyTitle: `%(partyElement)s (%(partyCount)s)`,
 

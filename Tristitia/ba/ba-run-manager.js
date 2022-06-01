@@ -2,12 +2,16 @@ const _ = require('lodash');
 const { sprintf } = require('sprintf-js');
 const fs = require('fs/promises');
 const schedule = require('node-schedule');
-const { BARun, elements, convertMemberToUser } = require('./ba-run');
+const { BARun, elements, runTypes, convertMemberToUser } = require('./ba-run');
 const cm = require('../calendar-manager');
 const { handleError } = require('../common');
 const { strings } = require('./ba-strings');
 const config = require('../config.json');
 const { DataResolver } = require('discord.js');
+const showdown = require('showdown');
+
+const converter = new showdown.Converter();
+converter.setOption('underline', true);
 
 // now with new and improved persistence!
 let futureRuns = [];
@@ -82,7 +86,7 @@ function scheduleNotifyEvents(client, run) {
 
 // create a new run, and add it to futureRuns
 // accentColor doesn't work if it's the default. Probably an API issue.
-async function newRun(interaction, time) {
+async function newRun(interaction, time, runType, runDescription) {
 	const now = Date.now();
 	if (time * 1000 < now) {
 		return 'Unable to create run: start time is in the past.';
@@ -96,7 +100,7 @@ async function newRun(interaction, time) {
 	await interaction.client.users.fetch(interaction.member.id, { force: true });
 	const raidLead = convertMemberToUser(interaction.member);
 
-	const run = new BARun(runId, raidLead, time);
+	const run = new BARun(runId, raidLead, time, runType, runDescription);
 	futureRuns.push(run);
 
 	await run.createAuditLogThread(interaction.client);
@@ -108,9 +112,14 @@ async function newRun(interaction, time) {
 	const startTime = new Date(time * 1000).toISOString();
 	const endTime = new Date((time + config.finishTimeDelta * 60) * 1000).toISOString();
 
+	let calendarDescription = strings.msgCalendarEventDescription;
+	if (runDescription !== undefined) {
+		calendarDescription += `\n\n<u>Run Description</u>\n${converter.makeHtml(runDescription)}`;
+	}
+
 	cm.addEvent(sprintf(strings.msgCalendarEventName, { id: runId }),
 		strings.msgCalendarEventLocation,
-		strings.msgCalendarEventDescription,
+		calendarDescription,
 		startTime, endTime);
 
 	await saveRuns();
@@ -270,6 +279,7 @@ async function moveMember(interaction, user, target, element) {
 }
 
 exports.elements = elements;
+exports.runTypes = runTypes;
 exports.convertMemberToUser = convertMemberToUser;
 exports.saveRuns = saveRuns;
 exports.loadRuns = loadRuns;

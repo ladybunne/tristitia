@@ -20,11 +20,19 @@ const auditColors = Object.freeze({
 	grey: '#b2b2b2',
 });
 
+const runTypes = Object.freeze({
+	rostered: '🟢 Rostered',
+	passwordDrop: '🟡 Password Drop',
+	ffa: '🔴 Free For All',
+});
+
 class BARun {
-	constructor(runId, raidLead, time) {
+	constructor(runId, raidLead, time, runType = runTypes.rostered, runDescription = null) {
 		this.runId = runId;
 		this.raidLead = raidLead;
 		this.time = time;
+		this.runType = runType;
+		this.runDescription = runDescription;
 		this.overviewMessageId;
 		this.rosterMessageId;
 		this.reserveThreadMessageId;
@@ -85,8 +93,16 @@ class BARun {
 			.setColor(this.raidLead.hexAccentColor)
 			.setThumbnail(this.raidLead.displayAvatarURL());
 
-		const descriptionArgs = { raidLead: this.formatUser(this.raidLead), time: this.time };
-		const description = sprintf(strings.msgEmbedDescription + `\n${config.spEmoji}`, descriptionArgs);
+		const descriptionArgs = {
+			raidLead: this.formatUser(this.raidLead),
+			time: this.time,
+			runType: this.runType,
+		};
+		let description = sprintf(strings.msgEmbedDescription, descriptionArgs);
+		if (this.runDescription != null) {
+			description += `\n**Description**: ${this.runDescription}`;
+		}
+		description += `\n${config.spEmoji}`;
 
 		embed.setDescription(description);
 
@@ -106,7 +122,11 @@ class BARun {
 				`${this.roster[elements.reserve].length} reserves)`)
 			.setColor(this.raidLead.hexAccentColor);
 
-		const descriptionArgs = { raidLead: this.formatUser(this.raidLead), time: this.time };
+		const descriptionArgs = {
+			raidLead: this.formatUser(this.raidLead),
+			time: this.time,
+			runType: this.runType,
+		};
 		const description = sprintf(strings.msgEmbedDescription + `\n${config.spEmoji}`, descriptionArgs);
 
 		embed.setDescription(description);
@@ -856,6 +876,7 @@ function formatPartyNameSimple(element, bold = true, icon = true) {
 }
 
 exports.elements = elements;
+exports.runTypes = runTypes;
 exports.BARun = BARun;
 exports.convertMemberToUser = convertMemberToUser;
 exports.formatPartyLeadSimple = formatPartyLeadSimple;

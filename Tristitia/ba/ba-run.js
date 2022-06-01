@@ -336,8 +336,10 @@ class BARun {
 		// send embeds to the right channel!
 		await signupChannel.send({ embeds: [this.embedOverview], components: this.buttonsOverview, fetchReply: true })
 			.then(message => this.overviewMessageId = message.id);
-		await signupChannel.send({ embeds: [this.embedRoster], components: this.buttonsRoster, fetchReply: true })
-			.then(message => this.rosterMessageId = message.id);
+		if (this.runType == runTypes.rostered) {
+			await signupChannel.send({ embeds: [this.embedRoster], components: this.buttonsRoster, fetchReply: true })
+				.then(message => this.rosterMessageId = message.id);
+		}
 	}
 
 	// ---------------------------------------- Internal ----------------------------------------
@@ -426,6 +428,7 @@ class BARun {
 
 		// overview
 		if (overview) try {
+			if (this.runType != runTypes.rostered) return;
 			const overviewMessage = await signupChannel.messages.fetch(this.overviewMessageId);
 			await overviewMessage.edit({ embeds: [this.embedOverview], components: this.buttonsOverview });
 		}
@@ -564,7 +567,6 @@ class BARun {
 	}
 
 	// logic for party signup request
-	// TODO add feedback when you try and join a full party.
 	async signupParty(interaction, incomingUser, element, nickname = undefined) {
 		if (element == elements.reserve) {
 			if (this.lockReserves) return false;

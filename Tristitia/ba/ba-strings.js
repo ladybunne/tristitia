@@ -74,7 +74,7 @@ const strings = {
 	msgPartiesThreadName: "Run No. %(runId)s - %(element)s Party",
 	msgReservesThreadName: "Run No. %(runId)s - Reserves + Public",
 
-	msgReservesThreadMessage: "Run #%(runId)s's passwords are now PUBLIC! See the below thread for details!",
+	msgReservesThreadMessage: `<@&${config.baDiscordRoleId}> Run #%(runId)s's passwords are now PUBLIC! See the thread below for details!`,
 
 	msgErrLeadPositionTaken: '**Unable to sign up as %(elementLead)s**. That position is already taken.',
 

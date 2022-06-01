@@ -127,7 +127,7 @@ class BARun {
 		const buttons = _.dropRight(Object.values(elements)).map(element => new MessageButton()
 			.setCustomId(`ba-signup-#${this.runId}-lead-${element}`)
 			.setEmoji(config.hexes[element])
-			.setLabel(this.formatPartyLeadSimple(element, false, false))
+			.setLabel(formatPartyLeadSimple(element, false, false))
 			.setStyle(element == elements.support ? 'PRIMARY' : 'SECONDARY'));
 
 		// row 1 - earth wind water support
@@ -149,7 +149,7 @@ class BARun {
 			return new MessageButton()
 				.setCustomId(`ba-signup-#${this.runId}-party-${element}`)
 				.setEmoji(config.icons[element])
-				.setLabel(this.formatPartyNameSimple(element, false, false))
+				.setLabel(formatPartyNameSimple(element, false, false))
 				.setStyle(style);
 		});
 
@@ -240,24 +240,6 @@ class BARun {
 		// add a space if not embellishments, or not lead
 		if (isRaidLead) output += `${!isLead || !embellishments ? ' ' : ''}👑`;
 		return output;
-	}
-
-	// formatted party lead and hex, optionally bold
-	formatPartyLeadSimple(element, bold = true, hex = true) {
-		if (element == undefined) return '';
-		return `${hex ? config.hexes[element] : ''}` +
-			`${bold ? '**' : ''}` +
-			`${element == elements.reserve ? '' : `${_.capitalize(element)} Lead`}` +
-			`${bold ? '**' : ''}`;
-	}
-
-	// formatted party name and icon, optionally bold
-	formatPartyNameSimple(element, bold = true, icon = true) {
-		if (element == undefined) return '';
-		return `${icon ? config.icons[element] : ''}` +
-			`${bold ? '**' : ''}` +
-			`${element == elements.reserve ? 'Reserves' : `${_.capitalize(element)} Party`}` +
-			`${bold ? '**' : ''}`;
 	}
 
 	// format the party name with member count
@@ -452,6 +434,7 @@ class BARun {
 
 			if (deleteThreads) await thread.delete().catch(handleError);
 			else {
+				await thread.setArchived(false).catch(handleError);
 				await thread.setLocked(true).catch(handleError);
 				await thread.setArchived(true).catch(handleError);
 			}
@@ -489,6 +472,10 @@ class BARun {
 		this.raidLead = convertMemberToUser(guildMember);
 	}
 
+	// TODO All of these button interaction functions assume they're getting called from a button.
+	// This is kind of a dumb assumption to make. It couples join/leave logic with UI updates, which is bad.
+
+
 	// logic for lead signup request
 	async signupLead(interaction, incomingUser, element, nickname = undefined) {
 		if (this.lockLeads) return false;
@@ -506,7 +493,7 @@ class BARun {
 		else if (this.leads[element] != null) {
 			// existing lead
 			await interaction.reply({ content: sprintf(strings.msgErrLeadPositionTaken,
-				{ elementLead: this.formatPartyLeadSimple(element, false) }), ephemeral: true });
+				{ elementLead: formatPartyLeadSimple(element, false) }), ephemeral: true });
 			return false;
 		}
 		else {
@@ -530,13 +517,26 @@ class BARun {
 		}
 
 		if (changed) {
-			await interaction.update({ embeds: [this.embedOverview], components: this.buttonsOverview });
-			await this.updateEmbeds(interaction.client, false, true);
+			// TODO This is bad handling of uncertain interaction types.
+			// this happens if it's a button interaction
+			try {
+				await interaction.update({ embeds: [this.embedOverview], components: this.buttonsOverview });
+				await this.updateEmbeds(interaction.client, false, true);
+			}
+			catch (error) {
+				// otherwise it's from somewhere else
+				if (error instanceof TypeError) {
+					await this.updateEmbeds(interaction.client, true, true);
+				}
+				// otherwise something went wrong
+				else handleError(error);
+			}
+
 			const args = {
 				user: this.formatUser(baUser, false, false),
-				oldLead: this.formatPartyLeadSimple(existing.lead),
-				newLead: this.formatPartyLeadSimple(element),
-				oldParty: this.formatPartyNameSimple(element),
+				oldLead: formatPartyLeadSimple(existing.lead),
+				newLead: formatPartyLeadSimple(element),
+				oldParty: formatPartyNameSimple(element),
 			};
 			await this.log(interaction.client, baUser, sprintf(auditMessage, args), auditColor);
 		}
@@ -557,8 +557,8 @@ class BARun {
 			// ephemeral reply
 			await interaction.reply({ content: sprintf(strings.msgErrJoinPartyLeadsLocked,
 				{
-					elementParty: this.formatPartyNameSimple(element, false),
-					elementLead: this.formatPartyLeadSimple(existing.lead),
+					elementParty: formatPartyNameSimple(element, false),
+					elementLead: formatPartyLeadSimple(existing.lead),
 				}),
 			ephemeral: true });
 			return false;
@@ -566,7 +566,7 @@ class BARun {
 		if (existing.party != elements.reserve && this.lockParties) {
 			// ephemeral reply
 			await interaction.reply({ content: sprintf(strings.msgErrJoinReservesPartiesLocked,
-				{ elementParty: this.formatPartyNameSimple(existing.party, false) }),
+				{ elementParty: formatPartyNameSimple(existing.party, false) }),
 			ephemeral: true });
 			return false;
 		}
@@ -579,8 +579,8 @@ class BARun {
 			// not allowed to step down from lead without explicitly doing so
 			await interaction.reply({ content: sprintf(strings.msgErrLeadDemote,
 				{
-					elementParty: this.formatPartyNameSimple(element, false),
-					elementLead: this.formatPartyLeadSimple(existing.lead),
+					elementParty: formatPartyNameSimple(element, false),
+					elementLead: formatPartyLeadSimple(existing.lead),
 				}),
 			ephemeral: true });
 			return false;
@@ -592,7 +592,7 @@ class BARun {
 		}
 		else if (this.roster[element].length >= config.maxPartySize - 1) {
 			await interaction.reply({ content: sprintf(strings.msgErrPartyFull,
-				{ elementParty: this.formatPartyNameSimple(element, false) }), ephemeral: true });
+				{ elementParty: formatPartyNameSimple(element, false) }), ephemeral: true });
 			return;
 		}
 		else {
@@ -611,11 +611,24 @@ class BARun {
 		}
 
 		if (changed) {
-			await interaction.update({ embeds: [this.embedRoster], components: this.buttonsRoster });
+			// TODO This is bad handling of uncertain interaction types.
+			// this happens if it's a button interaction
+			try {
+				await interaction.update({ embeds: [this.embedRoster], components: this.buttonsRoster });
+			}
+			catch (error) {
+				// otherwise it's from somewhere else
+				if (error instanceof TypeError) {
+					await this.updateEmbeds(interaction.client, false, true);
+				}
+				// otherwise something went wrong
+				else handleError(error);
+			}
+
 			const args = {
 				user: this.formatUser(baUser, false, false),
-				oldParty: this.formatPartyNameSimple(existing.party),
-				newParty: this.formatPartyNameSimple(element),
+				oldParty: formatPartyNameSimple(existing.party),
+				newParty: formatPartyNameSimple(element),
 			};
 			await this.log(interaction.client, baUser, sprintf(auditMessage, args), auditColor);
 		}
@@ -634,12 +647,12 @@ class BARun {
 		}
 		if (existing.lead && this.lockLeads) {
 			await interaction.reply({ content: sprintf(strings.msgErrCombatRoleLeadsLocked,
-				{ elementLead: this.formatPartyLeadSimple(existing.lead) }), ephemeral: true });
+				{ elementLead: formatPartyLeadSimple(existing.lead) }), ephemeral: true });
 			return false;
 		}
 		if (existing.party != elements.reserve && this.lockParties) {
 			await interaction.reply({ content: sprintf(strings.msgErrCombatRolePartiesLocked,
-				{ elementLead: this.formatPartyLeadSimple(existing.party) }), ephemeral: true });
+				{ elementLead: formatPartyLeadSimple(existing.party) }), ephemeral: true });
 			return false;
 		}
 
@@ -701,7 +714,7 @@ class BARun {
 			const args = {
 				partyLead: this.formatUser(this.leads[element], false, true),
 				runId: this.runId,
-				elementLead: this.formatPartyLeadSimple(element),
+				elementLead: formatPartyLeadSimple(element),
 				element: _.capitalize(element),
 				password: this.passwords[element],
 				time: this.timeNotifyParties,
@@ -755,7 +768,7 @@ class BARun {
 
 			const args = {
 				runId: this.runId,
-				elementParty: this.formatPartyNameSimple(element),
+				elementParty: formatPartyNameSimple(element),
 				icon: config.icons[element],
 				element: _.capitalize(element),
 				password: this.passwords[element],
@@ -791,7 +804,7 @@ class BARun {
 		const formattedRoster = this.formatPartyRoster(elements.reserve, true) + '\n\n';
 
 		const passwordList = _.dropRight(Object.values(elements)).reduce((acc, element) =>
-			acc + `${this.formatPartyNameSimple(element)}: **__${this.passwords[element]}__**\n`, '').slice(0, -1);
+			acc + `${formatPartyNameSimple(element)}: **__${this.passwords[element]}__**\n`, '').slice(0, -1);
 
 		const args = {
 			runId: this.runId,
@@ -824,6 +837,26 @@ function convertMemberToUser(member) {
 	return user;
 }
 
+// formatted party lead and hex, optionally bold
+function formatPartyLeadSimple(element, bold = true, hex = true) {
+	if (element == undefined) return '';
+	return `${hex ? config.hexes[element] : ''}` +
+		`${bold ? '**' : ''}` +
+		`${element == elements.reserve ? '' : `${_.capitalize(element)} Lead`}` +
+		`${bold ? '**' : ''}`;
+}
+
+// formatted party name and icon, optionally bold
+function formatPartyNameSimple(element, bold = true, icon = true) {
+	if (element == undefined) return '';
+	return `${icon ? config.icons[element] : ''}` +
+		`${bold ? '**' : ''}` +
+		`${element == elements.reserve ? 'Reserves' : `${_.capitalize(element)} Party`}` +
+		`${bold ? '**' : ''}`;
+}
+
 exports.elements = elements;
 exports.BARun = BARun;
 exports.convertMemberToUser = convertMemberToUser;
+exports.formatPartyLeadSimple = formatPartyLeadSimple;
+exports.formatPartyNameSimple = formatPartyNameSimple;

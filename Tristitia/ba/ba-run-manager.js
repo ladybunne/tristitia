@@ -78,12 +78,6 @@ function scheduleNotifyEvents(client, run) {
 	const jobFinish = schedule.scheduleJob(timeFinish, finish);
 
 	notifyJobs.set(run.runId, [jobNotifyLeads, jobNotifyParties, jobNotifyReserves, jobFinish]);
-
-	// const now = Date.now();
-	// setTimeout(notifyLeads, run.timeNotifyLeads * 1000 - now);
-	// setTimeout(notifyParties, run.timeNotifyParties * 1000 - now);
-	// setTimeout(notifyReserves, run.timeNotifyReserves * 1000 - now);
-	// setTimeout(finish, run.timeFinish * 1000 - now);
 }
 
 // create a new run, and add it to futureRuns
@@ -138,6 +132,14 @@ function lookupRunById(runId) {
 	state = 'cancelled';
 	run = cancelledRuns.find(element => element.runId == runId);
 	if (run) return { state, run };
+
+	return { state: 'no match', run: undefined };
+}
+
+// search current runs for a run by raid lead id
+function lookupRunByRaidLead(raidLead) {
+	const run = futureRuns.find(element => element.raidLead == raidLead);
+	if (run) return { state: 'future', run };
 
 	return { state: 'no match', run: undefined };
 }
@@ -244,6 +246,29 @@ async function setCombatRole(interaction, user, runId, combatRole) {
 	return outcome;
 }
 
+async function moveMember(interaction, user, target, element) {
+	const lookup = lookupRunByRaidLead(user.id);
+	if (!lookup.run) {
+		console.log(`Couldn't move <@${target.id}> in a run led by <@${user.id}>. Reason: ${lookup.state}`);
+		interaction.reply({ content: strings.msgErrMoveFailedNoRun, ephemeral: true });
+		return false;
+	}
+	const existing = lookup.run.checkExisting(target);
+	if (existing.lead === undefined && existing.party === undefined) {
+		interaction.reply({ content: strings.msgErrMoveFailedNotSignedUp, ephemeral: true });
+		return false;
+	}
+	if (existing.lead == element || existing.party == element) {
+		interaction.reply({ content: strings.msgErrMoveFailedAlreadyIn, ephemeral: true });
+		return false;
+	}
+	const lead = existing.lead !== undefined;
+	const outcome = lead ? await lookup.run.signupLead(interaction, target, element) :
+		await lookup.run.signupParty(interaction, target, element);
+	if (outcome) await saveRuns();
+	return outcome;
+}
+
 exports.elements = elements;
 exports.convertMemberToUser = convertMemberToUser;
 exports.saveRuns = saveRuns;
@@ -254,3 +279,4 @@ exports.updateEmbeds = updateEmbeds;
 exports.signupLead = signupLead;
 exports.signupParty = signupParty;
 exports.setCombatRole = setCombatRole;
+exports.moveMember = moveMember;

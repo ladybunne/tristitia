@@ -6,6 +6,7 @@ const config = require('../config.json');
 const strings = {
 	msgCreationText: 'Created run #%(id)s, led by %(raidLead)s, scheduled for <t:%(time)s:F>, <t:%(time)s:R>.',
 	msgCancelText: 'Cancelled run #%(id)s, previously scheduled for <t:%(time)s:F>, <t:%(time)s:R>.',
+	msgMoveText: 'Successfully moved %(target)s to %(elementParty)s.',
 
 	msgCalendarEventName: 'The Fire Place vs BA, Run #%(id)s',
 	msgCalendarEventLocation: 'Eureka Hydatos (Materia)',
@@ -88,6 +89,10 @@ const strings = {
 	msgErrCombatRoleSame: '**Unable to change combat role**. You are already a %(role)s!',
 	msgErrCombatRoleLeadsLocked: '**Unable to change combat role**. You are %(elementLead)s and lead roles are locked in.',
 	msgErrCombatRolePartiesLocked: '**Unable to change combat role**. You are in %(elementParty)s and party roles are locked in.',
+
+	msgErrMoveFailedNoRun: '**Unable to move target.** You are not the raid lead of any currently scheduled runs.',
+	msgErrMoveFailedNotSignedUp: '**Unable to move target.** They are not signed up for this run.',
+	msgErrMoveFailedAlreadyIn: '**Unable to move target.** They are already in that party.',
 
 	msgAuditLogThreadCreate: 'Hi, %(raidLead)s of Run #%(runId)s!\n\n' +
 

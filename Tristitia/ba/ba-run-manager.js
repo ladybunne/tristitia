@@ -136,6 +136,14 @@ function lookupRunById(runId) {
 	return { state: 'no match', run: undefined };
 }
 
+// search current runs for a run by raid lead id
+function lookupRunByRaidLead(raidLead) {
+	const run = futureRuns.find(element => element.raidLead == raidLead);
+	if (run) return { state: 'future', run };
+
+	return { state: 'no match', run: undefined };
+}
+
 // cancel a run, moving it from futureRuns to cancelledRuns
 // TODO allow overrides (so that select people, like staff, can cancel other people's runs)
 async function cancelRun(interaction, runId) {
@@ -238,19 +246,26 @@ async function setCombatRole(interaction, user, runId, combatRole) {
 	return outcome;
 }
 
-async function moveMember(interaction, user, runId, target, element, lead = false) {
-	const lookup = lookupRunById(runId);
+async function moveMember(interaction, user, target, element) {
+	const lookup = lookupRunByRaidLead(user.id);
 	if (!lookup.run) {
-		console.log(`Couldn't move member for Run #${runId}. Reason: ${lookup.state}`);
-		return;
+		console.log(`Couldn't move <@${target.id}> in a run led by <@${user.id}>. Reason: ${lookup.state}`);
+		interaction.reply({ content: strings.msgErrMoveFailedNoRun, ephemeral: true });
+		return false;
 	}
-	if (lookup.run.raidLead.id != interaction.member.user.id) {
-		return `You are not the raid lead of Run #${runId}! (You can't modify other people's rosters.)`;
+	const existing = lookup.run.checkExisting(target);
+	if (existing.lead === undefined && existing.party === undefined) {
+		interaction.reply({ content: strings.msgErrMoveFailedNotSignedUp, ephemeral: true });
+		return false;
 	}
+	if (existing.lead == element || existing.party == element) {
+		interaction.reply({ content: strings.msgErrMoveFailedAlreadyIn, ephemeral: true });
+		return false;
+	}
+	const lead = existing.lead !== undefined;
 	const outcome = lead ? await lookup.run.signupLead(interaction, target, element) :
 		await lookup.run.signupParty(interaction, target, element);
 	if (outcome) await saveRuns();
-	// TODO make this return some good words on a success
 	return outcome;
 }
 

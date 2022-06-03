@@ -102,14 +102,17 @@ class BARun {
 		if (this.runDescription != null) {
 			description += `\n**Description**: ${this.runDescription}`;
 		}
-		description += `\n${config.spEmoji}`;
+		if (this.runType == runTypes.ffa) description += `\n\n${strings.msgEmbedOverviewFFANoPartyLeads}`;
+		else description += `\n${config.spEmoji}`;
 
 		embed.setDescription(description);
 
-		const leadsList = _.dropRight(Object.values(elements)).reduce((acc, element) =>
-			acc + `${config.hexes[element]} ${this.formatUser(this.leads[element])}\n`, '');
+		if (this.runType != runTypes.ffa) {
+			const leadsList = _.dropRight(Object.values(elements)).reduce((acc, element) =>
+				acc + `${config.hexes[element]} ${this.formatUser(this.leads[element])}\n`, '');
 
-		embed.addField('**Party Leads**', leadsList, true);
+			embed.addField('**Party Leads**', leadsList, true);
+		}
 
 		return embed;
 	}
@@ -142,6 +145,9 @@ class BARun {
 	get buttonsOverview() {
 		// early abort if leads are locked
 		if (this.lockLeads) return [];
+
+		// ffa has no leads
+		if (this.runType == runTypes.ffa) return [];
 
 		// buttons
 		const buttons = _.dropRight(Object.values(elements)).map(element => new MessageButton()

@@ -25,7 +25,10 @@ const strings = {
 		'**Time**: <t:%(time)s:F>, <t:%(time)s:R>\n' +
 		'**Run Type**: %(runType)s',
 
+	msgEmbedOverviewFFANoPartyLeads: `No party leads for FFA runs, just show up and organise!`,
+
 	msgEmbedPartyTitle: `%(partyElement)s (%(partyCount)s)`,
+
 
 	msgNotifyLeads: "Hello, %(partyLead)s! You are Run #%(runId)s's %(elementLead)s. " +
 		"It's time to put up your party!\n" +
